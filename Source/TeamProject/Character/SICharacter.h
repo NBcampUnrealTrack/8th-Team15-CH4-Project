@@ -6,9 +6,11 @@
 #include "GameFramework/Character.h"
 #include "SICharacter.generated.h"
 
+struct FInputActionValue;
+
+class UUserWidget;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
-struct FInputActionValue;
 class UStaticMeshComponent;
 class UCameraComponent;
 
@@ -39,9 +41,11 @@ public:
 #pragma region Character Component
 	
 protected:
+	// 1인칭 카메라
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "CharacterComponent")
 	TObjectPtr<UCameraComponent> CameraComp;
 	
+	// 1인칭 카메라 전용 팔(손)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "CharacterComponent")
 	TObjectPtr<UStaticMeshComponent> ArmOnlyComp;
 	
@@ -50,18 +54,49 @@ protected:
 #pragma region Input
 	
 private:
+	// WASDQE 이동 조작
 	void Move(const FInputActionValue& InValue);
+	// 카메라 상하좌우 조작
 	void Look(const FInputActionValue& InValue);
-	virtual void Jump() override;
-	void Fly(const FInputActionValue& Invalue);
+	// 점프 or Fly 상태 전환
+	void HandleJumpNFly();
+	// 액터 변형 UI 모드 전환
+	void ToggleTransformUI();
 	
 protected:
+	// 플레이어 인풋 IA 식별자 데이터 에셋
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TObjectPtr<USIIPlayerCharacternputConfig> PlayerCharacterInputConfig;
-
+	// 플레이어 IMC
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TObjectPtr<UInputMappingContext> PlayerCharacterInputMappingContext;
 	
+private:
+	// 플레이어 Fly 상태 변환을 위한 값
+	float LastJumpTime = 0.0f;
+	const float DoubleJumpThreshold = 0.3f;
+	
+public:
+	// 플레이어 착지 시 자동 호출되는 Landed 함수
+	virtual void Landed(const FHitResult& Hit) override;
+	
 #pragma endregion 
+	
+#pragma region UI
+	
+protected:
+	// 액터 변형 관련 UI Widget Class
+	UPROPERTY(EditAnywhere, Category = "UI")
+	TSubclassOf<UUserWidget> TransformWidgetClass;
+	
+	// 액터 변형 관련 UI Widget Instance
+	UPROPERTY()
+	UUserWidget* TransformWidgetInstance;
+	
+private:
+	// UI Visble 변수
+	bool bIsUIVisible = false;
+	
+#pragma endregion
 	
 };

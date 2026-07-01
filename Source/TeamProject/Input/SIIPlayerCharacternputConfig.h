@@ -26,5 +26,11 @@ public:
 	TObjectPtr<UInputAction> Jump;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UInputAction> Fly;
+	TObjectPtr<UInputAction> Edit;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> Confirm;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> ToggleTransformUI;
 };
