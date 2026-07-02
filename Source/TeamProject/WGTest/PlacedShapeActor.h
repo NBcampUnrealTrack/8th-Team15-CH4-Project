@@ -22,12 +22,22 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId);
+	FName GetShapeId() const;
+	bool IsBeingEdited() const;
+	void SetBeingEdited(bool bInIsBeingEdited);
+	void SetHovered(bool bHovered);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
 private:
+	UPROPERTY(Replicated)
+	FName ReplicatedShapeId;
+
+	UPROPERTY(Replicated)
+	bool bIsBeingEdited;
+
 	UPROPERTY(ReplicatedUsing = OnRep_ShapeVisuals)
 	TObjectPtr<UStaticMesh> ReplicatedMesh;
 

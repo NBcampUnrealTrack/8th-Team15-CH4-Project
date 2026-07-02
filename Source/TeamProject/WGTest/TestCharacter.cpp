@@ -25,6 +25,12 @@ ATestCharacter::ATestCharacter()
 	SetNetUpdateFrequency(60.0f);
 	SetMinNetUpdateFrequency(30.0f);
 	ServerMoveSpeed = 1200.0f;
+	ServerMovementVector = FVector2D::ZeroVector;
+	ServerMovementControlYaw = 0.0f;
+	ServerMoveUpAxis = 0.0f;
+	LastServerMoveInputTime = 0.0f;
+	LastServerMoveUpInputTime = 0.0f;
+	ServerInputTimeout = 0.1f;
 
 	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
 	RootComponent = CapsuleComponent;
@@ -59,6 +65,20 @@ void ATestCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (HasAuthority())
+	{
+		const float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+		if (CurrentTime - LastServerMoveInputTime <= ServerInputTimeout)
+		{
+			ApplyServerMove(ServerMovementVector, ServerMovementControlYaw, DeltaTime);
+		}
+
+		if (CurrentTime - LastServerMoveUpInputTime <= ServerInputTimeout)
+		{
+			ApplyServerMoveUp(ServerMoveUpAxis, DeltaTime);
+		}
+	}
 }
 
 void ATestCharacter::PawnClientRestart()
@@ -143,12 +163,15 @@ void ATestCharacter::Look(const FInputActionValue& Value)
 
 void ATestCharacter::ServerMove_Implementation(FVector2D MovementVector, float ControlYaw)
 {
-	ApplyServerMove(MovementVector, ControlYaw);
+	ServerMovementVector = MovementVector;
+	ServerMovementControlYaw = ControlYaw;
+	LastServerMoveInputTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }
 
 void ATestCharacter::ServerMoveUp_Implementation(float AxisValue)
 {
-	ApplyServerMoveUp(AxisValue);
+	ServerMoveUpAxis = AxisValue;
+	LastServerMoveUpInputTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }
 
 void ATestCharacter::ApplyMove(FVector2D MovementVector, float ControlYaw)
@@ -167,7 +190,7 @@ void ATestCharacter::ApplyMoveUp(float AxisValue)
 	AddMovementInput(FVector::UpVector, FMath::Clamp(AxisValue, -1.0f, 1.0f));
 }
 
-void ATestCharacter::ApplyServerMove(FVector2D MovementVector, float ControlYaw)
+void ATestCharacter::ApplyServerMove(FVector2D MovementVector, float ControlYaw, float DeltaTime)
 {
 	MovementVector.X = FMath::Clamp(MovementVector.X, -1.0f, 1.0f);
 	MovementVector.Y = FMath::Clamp(MovementVector.Y, -1.0f, 1.0f);
@@ -186,13 +209,12 @@ void ATestCharacter::ApplyServerMove(FVector2D MovementVector, float ControlYaw)
 	const FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector Right = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 	const FVector MoveDirection = ((Forward * MovementVector.Y) + (Right * MovementVector.X)).GetSafeNormal();
-	const float DeltaSeconds = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f;
 
-	AddActorWorldOffset(MoveDirection * ServerMoveSpeed * DeltaSeconds, true);
+	AddActorWorldOffset(MoveDirection * ServerMoveSpeed * DeltaTime, true);
 	ForceNetUpdate();
 }
 
-void ATestCharacter::ApplyServerMoveUp(float AxisValue)
+void ATestCharacter::ApplyServerMoveUp(float AxisValue, float DeltaTime)
 {
 	AxisValue = FMath::Clamp(AxisValue, -1.0f, 1.0f);
 	if (FMath::IsNearlyZero(AxisValue))
@@ -200,9 +222,7 @@ void ATestCharacter::ApplyServerMoveUp(float AxisValue)
 		return;
 	}
 
-	const float DeltaSeconds = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f;
-
-	AddActorWorldOffset(FVector::UpVector * AxisValue * ServerMoveSpeed * DeltaSeconds, true);
+	AddActorWorldOffset(FVector::UpVector * AxisValue * ServerMoveSpeed * DeltaTime, true);
 	ForceNetUpdate();
 }
 

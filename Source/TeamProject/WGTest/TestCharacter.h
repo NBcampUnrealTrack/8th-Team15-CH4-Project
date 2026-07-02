@@ -83,8 +83,15 @@ private:
 
 	void ApplyMove(FVector2D MovementVector, float ControlYaw);
 	void ApplyMoveUp(float AxisValue);
-	void ApplyServerMove(FVector2D MovementVector, float ControlYaw);
-	void ApplyServerMoveUp(float AxisValue);
+	void ApplyServerMove(FVector2D MovementVector, float ControlYaw, float DeltaTime);
+	void ApplyServerMoveUp(float AxisValue, float DeltaTime);
 	void AddMappingContext();
+
+	FVector2D ServerMovementVector;
+	float ServerMovementControlYaw;
+	float ServerMoveUpAxis;
+	float LastServerMoveInputTime;
+	float LastServerMoveUpInputTime;
+	float ServerInputTimeout;
 
 };

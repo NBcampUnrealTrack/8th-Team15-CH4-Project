@@ -13,6 +13,7 @@ APlacedShapeActor::APlacedShapeActor()
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 	SetReplicateMovement(true);
+	bIsBeingEdited = false;
 	ReplicatedScale = FVector::OneVector;
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
@@ -24,6 +25,8 @@ void APlacedShapeActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME(APlacedShapeActor, ReplicatedShapeId);
+	DOREPLIFETIME(APlacedShapeActor, bIsBeingEdited);
 	DOREPLIFETIME(APlacedShapeActor, ReplicatedMesh);
 	DOREPLIFETIME(APlacedShapeActor, ReplicatedMaterial);
 	DOREPLIFETIME(APlacedShapeActor, ReplicatedScale);
@@ -42,12 +45,33 @@ bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName S
 		return false;
 	}
 
+	ReplicatedShapeId = ShapeId;
 	ReplicatedMesh = ShapeDefinition->Mesh;
 	ReplicatedMaterial = ShapeDefinition->PlacedMaterial;
 	ReplicatedScale = ShapeDefinition->DefaultScale;
 
 	ApplyShapeVisuals();
 	return true;
+}
+
+FName APlacedShapeActor::GetShapeId() const
+{
+	return ReplicatedShapeId;
+}
+
+bool APlacedShapeActor::IsBeingEdited() const
+{
+	return bIsBeingEdited;
+}
+
+void APlacedShapeActor::SetBeingEdited(bool bInIsBeingEdited)
+{
+	bIsBeingEdited = bInIsBeingEdited;
+}
+
+void APlacedShapeActor::SetHovered(bool bHovered)
+{
+	MeshComponent->SetRenderCustomDepth(bHovered);
 }
 
 void APlacedShapeActor::OnRep_ShapeVisuals()
