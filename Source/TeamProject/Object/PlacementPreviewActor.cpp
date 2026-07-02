@@ -1,11 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "WGTest/PlacementPreviewActor.h"
+#include "Object/PlacementPreviewActor.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DataTable.h"
-#include "WGTest/ShapeDefinitionRow.h"
+#include "Object/ShapeDefinitionRow.h"
 
 APlacementPreviewActor::APlacementPreviewActor()
 {

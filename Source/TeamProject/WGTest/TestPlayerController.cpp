@@ -7,9 +7,9 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "InputCoreTypes.h"
-#include "WGTest/PlacedShapeActor.h"
-#include "WGTest/PlacementPreviewActor.h"
-#include "WGTest/ShapeDefinitionRow.h"
+#include "Object/PlacedShapeActor.h"
+#include "Object/PlacementPreviewActor.h"
+#include "Object/ShapeDefinitionRow.h"
 
 ATestPlayerController::ATestPlayerController()
 {

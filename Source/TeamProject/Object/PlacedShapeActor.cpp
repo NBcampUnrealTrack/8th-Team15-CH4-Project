@@ -1,12 +1,12 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "WGTest/PlacedShapeActor.h"
+#include "Object/PlacedShapeActor.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DataTable.h"
 #include "Net/UnrealNetwork.h"
-#include "WGTest/ShapeDefinitionRow.h"
+#include "Object/ShapeDefinitionRow.h"
 
 APlacedShapeActor::APlacedShapeActor()
 {
