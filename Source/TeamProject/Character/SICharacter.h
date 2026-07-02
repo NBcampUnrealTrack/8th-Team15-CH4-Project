@@ -6,13 +6,13 @@
 #include "GameFramework/Character.h"
 #include "SICharacter.generated.h"
 
-struct FInputActionValue;
-
-class UUserWidget;
+class USIUserWidget;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
 class UStaticMeshComponent;
 class UCameraComponent;
+
+struct FInputActionValue;
 
 UCLASS()
 class TEAMPROJECT_API ASICharacter : public ACharacter
@@ -60,6 +60,9 @@ private:
 	void Look(const FInputActionValue& InValue);
 	// 점프 or Fly 상태 전환
 	void HandleJumpNFly();
+	// UI Only Mode 전환
+	void ToggleUIOnlyMode();
+	
 	// 액터 변형 UI 모드 전환
 	void ToggleTransformUI();
 	
@@ -87,13 +90,15 @@ public:
 protected:
 	// 액터 변형 관련 UI Widget Class
 	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<UUserWidget> TransformWidgetClass;
+	TSubclassOf<USIUserWidget> TransformWidgetClass;
 	
 	// 액터 변형 관련 UI Widget Instance
 	UPROPERTY()
-	UUserWidget* TransformWidgetInstance;
+	USIUserWidget* TransformWidgetInstance;
 	
 private:
+	// UI Only Mode 변수
+	bool bIsUIOnlyMode = false;
 	// UI Visble 변수
 	bool bIsUIVisible = false;
 	

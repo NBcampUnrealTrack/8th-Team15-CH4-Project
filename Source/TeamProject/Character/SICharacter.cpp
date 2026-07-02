@@ -7,12 +7,12 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
-#include "Blueprint/UserWidget.h"
 #include "Components/StaticMeshComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Input/SIIPlayerCharacternputConfig.h"
+#include "UI/SIUserWidget.h"
 
 #pragma region ACharacter Override
 
@@ -63,6 +63,20 @@ void ASICharacter::BeginPlay()
 	
 	// PlayerCharacterInputMappingContext Mapping
 	Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 1);
+	
+	// 인스턴스가 없을 때, StaticClass만 존재한다면
+	if (!TransformWidgetInstance && TransformWidgetClass)
+	{
+		// StaticClass를 통해 Instance화
+		TransformWidgetInstance = CreateWidget<USIUserWidget>(PlayerController, TransformWidgetClass);
+	}
+		
+	// 인스턴스가 존재한다면
+	if (TransformWidgetInstance)
+	{
+		// 뷰포트에 노출
+		TransformWidgetInstance->AddToViewport();
+	}
 }
 
 // Called every frame
@@ -86,7 +100,7 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Jump, ETriggerEvent::Started, this, &ThisClass::HandleJumpNFly);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Jump, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ToggleTransformUI, ETriggerEvent::Triggered, this, &ThisClass::ToggleTransformUI);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ToggleTransformUI, ETriggerEvent::Triggered, this, &ThisClass::ToggleUIOnlyMode);
 	}
 }
 
@@ -96,6 +110,12 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
 void ASICharacter::Move(const FInputActionValue& InValue)
 {
+	// UI 조작 중이라면 입력을 무시합니다.
+	if (bIsUIOnlyMode)
+	{
+		return;
+	}
+	
 	const FVector MovementVector = InValue.Get<FVector>();
 	UE_LOG(LogTemp, Warning, TEXT("Input: %s"), *MovementVector.ToString());
 	
@@ -154,6 +174,12 @@ void ASICharacter::Move(const FInputActionValue& InValue)
 
 void ASICharacter::Look(const FInputActionValue& InValue)
 {
+	// UI 조작 중이라면 입력을 무시합니다.
+	if (bIsUIOnlyMode)
+	{
+		return;
+	}
+	
 	FVector2D LookVector = InValue.Get<FVector2D>();
 
 	AddControllerYawInput(LookVector.X);
@@ -162,6 +188,12 @@ void ASICharacter::Look(const FInputActionValue& InValue)
 
 void ASICharacter::HandleJumpNFly()
 {
+	// UI 조작 중이라면 입력을 무시합니다.
+	if (bIsUIOnlyMode)
+	{
+		return;
+	}
+	
 	if (IsValid(GetWorld()) == false)
 	{
 		return;
@@ -203,6 +235,47 @@ void ASICharacter::HandleJumpNFly()
 	LastJumpTime = CurrentTime;
 }
 
+void ASICharacter::ToggleUIOnlyMode()
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (IsValid(PlayerController) == false)
+	{
+		return;
+	}
+	
+	bIsUIOnlyMode = !bIsUIOnlyMode;
+	
+	if (bIsUIOnlyMode)
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+ 
+		// 1. 마우스 위치를 먼저 중앙으로 '예약' 세팅
+		int32 ViewportSizeX, ViewportSizeY;
+		PlayerController->GetViewportSize(ViewportSizeX, ViewportSizeY);
+		PlayerController->SetMouseLocation(ViewportSizeX / 2, ViewportSizeY / 2);
+ 
+		// 2. 입력 모드 설정 (이 시점에서 위젯 포커스 준비)
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(TransformWidgetInstance->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+		InputMode.SetHideCursorDuringCapture(false);
+		PlayerController->SetInputMode(InputMode);
+ 
+		// 3. 마지막에 커서를 노출 (이미 중앙으로 옮겨진 상태에서 등장)
+		PlayerController->bShowMouseCursor = true;
+	}
+	else
+	{
+		// 게임 전용 모드로 복구
+		FInputModeGameOnly InputMode;
+		PlayerController->SetInputMode(InputMode);
+		PlayerController->bShowMouseCursor = false;
+	}
+	
+	// 모드 전환 시 박혀있던 키 입력들 초기화
+	PlayerController->FlushPressedKeys();	
+}
+
 void ASICharacter::ToggleTransformUI()
 {
 	APlayerController* PlayerController = Cast<APlayerController>(GetController());
@@ -221,7 +294,7 @@ void ASICharacter::ToggleTransformUI()
 		if (!TransformWidgetInstance && TransformWidgetClass)
 		{
 			// StaticClass를 통해 Instance화
-			TransformWidgetInstance = CreateWidget<UUserWidget>(PlayerController, TransformWidgetClass);
+			TransformWidgetInstance = CreateWidget<USIUserWidget>(PlayerController, TransformWidgetClass);
 		}
 		
 		// 인스턴스가 존재한다면
