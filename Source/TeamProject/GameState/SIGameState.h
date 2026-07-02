@@ -1,29 +1,28 @@
-/** SIGameState.h */
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameStateBase.h"
+#include "GameFramework/GameState.h" // AGameStateBase -> AGameState로 변경
 #include "SIGameState.generated.h"
 
-/**
-*게임의 현재 진행 상태를 나타내는 열거형
-*상태 머신 기반으로 게임의 흐름을 제어하는 데 사용
-*/
+
 UENUM(BlueprintType)
-enum class EMatchState : uint8
+enum class ESIGamePhase : uint8
 {
-	WaitingToStart, // 대기실: 플레이어 입장 및 게임 시작 대기
-	InProgress, // 진행 중: 플레이어들이 순서대로 출제하고 정답을 맞추는 상태
-	GameOver, // 종료: 최종 승리자 산출 및 결과 연출
-	ReturningToLobby // 로비 복귀: 게임이 끝나고 로비로 돌아가는 중
+	None UMETA(DisplayName = "대기 중"),
+	BuildPhase UMETA(DisplayName = "제작 단계"),
+	GuessPhase UMETA(DisplayName = "정답 맞추기 단계"),
+	ResultPhase UMETA(DisplayName = "결과 발표")
 };
 
+// UI 블루프린트에 값이 변했음을 즉시 알려주기 위한 델리게이트 선언
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPhaseChangedSignature, ESIGamePhase, NewPhase);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTimeUpdatedSignature, int32, NewTime);
+
 /**
-*3D 캐치마인드 방식 게임의 글로벌 상태를 관리하는 GameState 클래스
-*서버와 모든 클라이언트에게 공유되며, 현재 출제자, 남은 시간, 게임 상태 등을 동기화.
-*/
+ * 게임의 전반적인 상태(타이머, 현재 페이즈, 점수 등)를 모든 클라이언트와 동기화하는 클래스입니다.
+ */
 UCLASS()
-class TEAMPROJECT_API ASIGameState : public AGameStateBase
+class TEAMPROJECT_API ASIGameState : public AGameState
 {
 	GENERATED_BODY()
 
@@ -32,20 +31,48 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** 현재 게임의 진행 상태 (대기, 진행, 종료 등) */
-	UPROPERTY(ReplicatedUsing = OnRep_MatchState, BlueprintReadOnly, Category = "Match")
-	EMatchState CurrentMatchState;
+	// ==========================================
+	// [게임 페이즈(단계) 관리]
+	// ==========================================
 
-	/** 현재 턴에서 문제를 출제하고 있는 플레이어의 상태 정보*/
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
-	APlayerState* CurrentPresenter;
+	// 현재 게임이 어느 단계인지 나타냅니다. 값이 바뀌면 OnRep_GamePhase가 실행됩니다.
+	UPROPERTY(ReplicatedUsing = OnRep_GamePhase, Transient, BlueprintReadOnly, Category = "GamePhase")
+	ESIGamePhase CurrentGamePhase;
 
-	/** 현재 라운드의 남은 시간 (초 단위) */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Match")
-	float RemainingTime;
-
-protected:
-	/** MatchState가 변경될 때 클라이언트에서 호출되는 이벤트 함수 */
 	UFUNCTION()
-	void OnRep_MatchState();
+	void OnRep_GamePhase();
+
+	// 블루프린트에서 Event 노드로 뺄 수 있는 델리게이트 (UI 업데이트용)
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnPhaseChangedSignature OnPhaseChanged;
+
+	// ==========================================
+	// [타이머 관리]
+	// ==========================================
+
+	// 남은 시간 (초). 값이 바뀌면 OnRep_RemainingTime이 실행됩니다.
+	UPROPERTY(ReplicatedUsing = OnRep_RemainingTime, Transient, BlueprintReadOnly, Category = "GameTimer")
+	int32 RemainingTime;
+
+	UFUNCTION()
+	void OnRep_RemainingTime();
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnTimeUpdatedSignature OnTimeUpdated;
+
+	// ==========================================
+	// [게임 데이터 동기화]
+	// ==========================================
+
+	// 현재 출제자 (도형을 만들었거나, 현재 작업 공간의 주인)
+	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
+	class APlayerState* CurrentPresenter;
+
+	// 현재 라운드 진행도 (몇 번째 플레이어의 턴인지)
+	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
+	int32 CurrentRound;
+
+	// 총 라운드 수 (총 플레이어 수와 동일하게 설정됨)
+	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
+	int32 TotalRounds;
 };
