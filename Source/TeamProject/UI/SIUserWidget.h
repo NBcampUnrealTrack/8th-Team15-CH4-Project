@@ -7,10 +7,10 @@
 #include "SIUserWidget.generated.h"
 
 
-
 UCLASS()
 class TEAMPROJECT_API USIUserWidget : public UUserWidget
 {
 	GENERATED_BODY()
+
 
 };

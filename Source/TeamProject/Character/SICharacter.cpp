@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/SICharacter.h"
@@ -17,7 +17,7 @@
 #include "Object/PlacedShapeActor.h"
 #include "Object/PlacementPreviewActor.h"
 #include "Object/ShapeDefinitionRow.h"
-#include "UI/SIUserWidget.h"
+#include "UI/DetailPanelWidget.h"
 
 #pragma region ACharacter Override
 
@@ -85,7 +85,7 @@ void ASICharacter::BeginPlay()
 	if (!TransformWidgetInstance && TransformWidgetClass)
 	{
 		// StaticClass를 통해 Instance화
-		TransformWidgetInstance = CreateWidget<USIUserWidget>(PlayerController, TransformWidgetClass);
+		TransformWidgetInstance = CreateWidget<UDetailPanelWidget>(PlayerController, TransformWidgetClass);
 	}
 		
 	// 인스턴스가 존재한다면
@@ -326,7 +326,7 @@ void ASICharacter::ToggleTransformUI()
 		if (!TransformWidgetInstance && TransformWidgetClass)
 		{
 			// StaticClass를 통해 Instance화
-			TransformWidgetInstance = CreateWidget<USIUserWidget>(PlayerController, TransformWidgetClass);
+			TransformWidgetInstance = CreateWidget<UDetailPanelWidget>(PlayerController, TransformWidgetClass);
 		}
 		
 		// 인스턴스가 존재한다면

@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -8,7 +8,7 @@
 
 class APlacedShapeActor;
 class APlacementPreviewActor;
-class USIUserWidget;
+class UDetailPanelWidget;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
 class UStaticMeshComponent;
@@ -107,11 +107,11 @@ public:
 protected:
 	// 액터 변형 관련 UI Widget Class
 	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<USIUserWidget> TransformWidgetClass;
+	TSubclassOf<UDetailPanelWidget> TransformWidgetClass;
 	
 	// 액터 변형 관련 UI Widget Instance
 	UPROPERTY()
-	USIUserWidget* TransformWidgetInstance;
+	TObjectPtr<UDetailPanelWidget> TransformWidgetInstance;
 	
 private:
 	// UI Only Mode 변수
