@@ -3,6 +3,7 @@
 
 #include "Object/PlacedShapeActor.h"
 
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DataTable.h"
 #include "Net/UnrealNetwork.h"
@@ -19,6 +20,15 @@ APlacedShapeActor::APlacedShapeActor()
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	EditTraceComponent = CreateDefaultSubobject<UBoxComponent>(TEXT("EditTraceComponent"));
+	EditTraceComponent->SetupAttachment(MeshComponent);
+	EditTraceComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	EditTraceComponent->SetCollisionObjectType(ECC_WorldDynamic);
+	EditTraceComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	EditTraceComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	EditTraceComponent->SetBoxExtent(FVector(50.0f));
+	EditTraceComponent->SetHiddenInGame(true);
 }
 
 void APlacedShapeActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -84,6 +94,7 @@ void APlacedShapeActor::ApplyShapeVisuals()
 	if (ReplicatedMesh)
 	{
 		MeshComponent->SetStaticMesh(ReplicatedMesh);
+		UpdateEditTraceBounds();
 	}
 
 	if (ReplicatedMaterial)
@@ -92,4 +103,18 @@ void APlacedShapeActor::ApplyShapeVisuals()
 	}
 
 	SetActorScale3D(ReplicatedScale);
+}
+
+void APlacedShapeActor::UpdateEditTraceBounds()
+{
+	if (!ReplicatedMesh || !EditTraceComponent)
+	{
+		return;
+	}
+
+	const FBoxSphereBounds MeshBounds = ReplicatedMesh->GetBounds();
+	const FVector BoxExtent = MeshBounds.BoxExtent.ComponentMax(FVector(1.0f));
+
+	EditTraceComponent->SetRelativeLocation(MeshBounds.Origin);
+	EditTraceComponent->SetBoxExtent(BoxExtent);
 }

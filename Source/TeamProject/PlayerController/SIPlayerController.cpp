@@ -110,7 +110,15 @@ void ASIPlayerController::ConfirmPlacement()
 	{
 		// 설치는 서버에서 확정
 		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform());
-		ClearPreview();
+		if (bIsEditingExistingShape)
+		{
+			ClearPreview();
+			return;
+		}
+
+		bIsEditingExistingShape = false;
+		EditingOriginalShapeId = NAME_None;
+		EditingOriginalTransform = FTransform::Identity;
 		return;
 	}
 

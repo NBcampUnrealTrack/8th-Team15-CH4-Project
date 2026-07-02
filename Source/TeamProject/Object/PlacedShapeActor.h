@@ -8,6 +8,7 @@
 
 class UDataTable;
 class UMaterialInterface;
+class UBoxComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 
@@ -31,6 +32,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UBoxComponent> EditTraceComponent;
+
 private:
 	UPROPERTY(Replicated)
 	FName ReplicatedShapeId;
@@ -51,4 +55,5 @@ private:
 	void OnRep_ShapeVisuals();
 
 	void ApplyShapeVisuals();
+	void UpdateEditTraceBounds();
 };
