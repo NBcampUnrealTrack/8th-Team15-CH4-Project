@@ -50,9 +50,6 @@ void ASIPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 
 	// 도형 프리뷰 선택
-	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &ASIPlayerController::StartBoxPreview);
-	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ASIPlayerController::StartSpherePreview);
-
 	// 프리뷰 거리 조절
 	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &ASIPlayerController::IncreasePreviewDistance);
 	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &ASIPlayerController::DecreasePreviewDistance);
@@ -102,6 +99,16 @@ void ASIPlayerController::StartBoxPreview()
 void ASIPlayerController::StartSpherePreview()
 {
 	StartShapePreview(TEXT("Sphere"));
+}
+
+void ASIPlayerController::StartCylinderPreview()
+{
+	StartShapePreview(TEXT("Cylinder"));
+}
+
+void ASIPlayerController::StartConePreview()
+{
+	StartShapePreview(TEXT("Cone"));
 }
 
 void ASIPlayerController::ConfirmPlacement()

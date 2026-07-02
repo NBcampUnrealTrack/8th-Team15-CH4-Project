@@ -26,6 +26,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartShapePreview(FName ShapeId);
 
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartBoxPreview();
+
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartSpherePreview();
+
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartCylinderPreview();
+
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartConePreview();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -70,8 +82,6 @@ private:
 	FName EditingOriginalShapeId;
 	FTransform EditingOriginalTransform;
 
-	void StartBoxPreview();
-	void StartSpherePreview();
 	void ConfirmPlacement();
 	void CancelPreview();
 	void IncreasePreviewDistance();
