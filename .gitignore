@@ -24,5 +24,8 @@ Saved/
 *.ipch
 *.vsconfig
 
+#Rider
+*.DotSettings.user
+
 CLAUDE.md
 .claude/
