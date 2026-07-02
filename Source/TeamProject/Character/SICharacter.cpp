@@ -373,6 +373,21 @@ void ASICharacter::StartBoxPreview()
 	StartShapePreview(TEXT("Box"));
 }
 
+void ASICharacter::StartSpherePreview()
+{
+	StartShapePreview(TEXT("Sphere"));
+}
+
+void ASICharacter::StartCylinderPreview()
+{
+	StartShapePreview(TEXT("Cylinder"));
+}
+
+void ASICharacter::StartConePreview()
+{
+	StartShapePreview(TEXT("Cone"));
+}
+
 void ASICharacter::ConfirmPlacement()
 {
 	if (PreviewActor && !CurrentPreviewShapeId.IsNone())

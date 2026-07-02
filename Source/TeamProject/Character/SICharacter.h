@@ -69,7 +69,15 @@ private:
 	void ToggleTransformUI();
 	
 	// Preview 관련 인풋
+	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartBoxPreview();
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartSpherePreview();
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartCylinderPreview();
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartConePreview();
+	
 	void ConfirmPlacement();
 	void CancelPreview();
 	void IncreasePreviewDistance();
