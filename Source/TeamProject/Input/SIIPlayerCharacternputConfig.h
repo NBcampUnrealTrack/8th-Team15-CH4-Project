@@ -26,11 +26,21 @@ public:
 	TObjectPtr<UInputAction> Jump;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UInputAction> Edit;
+	TObjectPtr<UInputAction> ToggleTransformUI;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> Preview;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UInputAction> Confirm;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UInputAction> ToggleTransformUI;
+	TObjectPtr<UInputAction> Cancel;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> IncreasePreviewDistance;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> DecreasePreviewDistance;
+	
 };

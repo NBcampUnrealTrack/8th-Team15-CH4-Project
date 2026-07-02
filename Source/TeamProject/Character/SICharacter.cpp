@@ -1,7 +1,9 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/SICharacter.h"
+
+#include <string>
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -12,13 +14,16 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Input/SIIPlayerCharacternputConfig.h"
+#include "Object/PlacedShapeActor.h"
+#include "Object/PlacementPreviewActor.h"
+#include "Object/ShapeDefinitionRow.h"
 #include "UI/SIUserWidget.h"
 
 #pragma region ACharacter Override
 
 ASICharacter::ASICharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	
 	// 1인칭 카메라
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -36,7 +41,19 @@ ASICharacter::ASICharacter()
 	
 	// Fly 상태 Movement 제어값
 	GetCharacterMovement()->BrakingDecelerationFlying = 2000.0f;
-	GetCharacterMovement()->MaxFlySpeed = 2000.0f;
+	GetCharacterMovement()->MaxFlySpeed = 800.0f;
+	
+	// Object Settings
+	PreviewDistance = 600.0f;
+	MinPreviewDistance = 150.0f;
+	MaxPreviewDistance = 2000.0f;
+	PreviewDistanceStep = 100.0f;
+	EditTraceDistance = 3000.0f;
+	MaxEditDistance = 3000.0f;
+	PreviewRotation = FQuat::Identity;
+	bIsEditingExistingShape = false;
+	PreviewActorClass = APlacementPreviewActor::StaticClass();
+	PlacedShapeActorClass = APlacedShapeActor::StaticClass();
 }
 
 // Called when the game starts or when spawned
@@ -84,6 +101,8 @@ void ASICharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	UpdatePreviewTransform();
+	UpdateHoveredShape();
 }
 
 // Called to bind functionality to input
@@ -101,6 +120,12 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Jump, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ToggleTransformUI, ETriggerEvent::Triggered, this, &ThisClass::ToggleUIOnlyMode);
+		
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Preview, ETriggerEvent::Started, this, &ThisClass::StartBoxPreview);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->IncreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::IncreasePreviewDistance);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->DecreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::DecreasePreviewDistance);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Started, this, &ThisClass::ConfirmPlacement);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Cancel, ETriggerEvent::Started, this, &ThisClass::CancelPreview);
 	}
 }
 
@@ -184,6 +209,13 @@ void ASICharacter::Look(const FInputActionValue& InValue)
 
 	AddControllerYawInput(LookVector.X);
 	AddControllerPitchInput(LookVector.Y);
+}
+
+void ASICharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+	GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("ASICharacter::Landed"));
+	// Effect, Sound Code
 }
 
 void ASICharacter::HandleJumpNFly()
@@ -336,11 +368,332 @@ void ASICharacter::ToggleTransformUI()
 	}
 }
 
-void ASICharacter::Landed(const FHitResult& Hit)
+void ASICharacter::StartBoxPreview()
 {
-	Super::Landed(Hit);
-	GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("ASICharacter::Landed"));
-	// Effect, Sound Code
+	StartShapePreview(TEXT("Box"));
+}
+
+void ASICharacter::ConfirmPlacement()
+{
+	if (PreviewActor && !CurrentPreviewShapeId.IsNone())
+	{
+		// 설치는 서버에서 확정
+		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform());
+		if (bIsEditingExistingShape)
+		{
+			ClearPreview();
+			return;
+		}
+
+		bIsEditingExistingShape = false;
+		EditingOriginalShapeId = NAME_None;
+		EditingOriginalTransform = FTransform::Identity;
+		return;
+	}
+
+	// 기존 도형 편집 요청
+	Server_RequestEditShape(HoveredShape);
+}
+
+void ASICharacter::CancelPreview()
+{
+	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	if (bIsEditingExistingShape && !EditingOriginalShapeId.IsNone())
+	{
+		// 편집 취소 시 원래 도형 복구
+		Server_RequestSpawnShape(EditingOriginalShapeId, EditingOriginalTransform);
+	}
+
+	ClearPreview();
+}
+
+void ASICharacter::IncreasePreviewDistance()
+{
+	PreviewDistance = FMath::Clamp(PreviewDistance + PreviewDistanceStep, MinPreviewDistance, MaxPreviewDistance);
+	UpdatePreviewTransform();
+}
+
+void ASICharacter::DecreasePreviewDistance()
+{
+	PreviewDistance = FMath::Clamp(PreviewDistance - PreviewDistanceStep, MinPreviewDistance, MaxPreviewDistance);
+	UpdatePreviewTransform();
+}
+
+#pragma endregion
+
+#pragma region Obeject
+
+void ASICharacter::StartShapePreview(FName ShapeId)
+{
+	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PreviewActorClass)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (!PreviewActor)
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		PreviewActor = World->SpawnActor<APlacementPreviewActor>(PreviewActorClass, FTransform::Identity, SpawnParameters);
+	}
+
+	if (PreviewActor && PreviewActor->SetPreviewShape(ShapeDefinitionTable, ShapeId))
+	{
+		SetHoveredShape(nullptr);
+		CurrentPreviewShapeId = ShapeId;
+		PreviewRotation = FQuat::Identity;
+		bIsEditingExistingShape = false;
+		EditingOriginalShapeId = NAME_None;
+		EditingOriginalTransform = FTransform::Identity;
+		UpdatePreviewTransform();
+	}
+}
+
+void ASICharacter::UpdatePreviewTransform()
+{
+	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	AController* PlayerController = GetController();
+	if (IsValid(PlayerController) == false)
+	{
+		return;
+	}
+	
+	PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+	const FVector TraceStart = ViewLocation;
+	const FVector TraceEnd = TraceStart + (ViewRotation.Vector() * PreviewDistance);
+
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(UpdatePlacementPreview), false, this);
+
+	const bool bHit = GetWorld() && GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
+	const FVector PreviewLocation = bHit ? HitResult.ImpactPoint : TraceEnd;
+
+	PreviewActor->SetActorLocation(PreviewLocation);
+	PreviewActor->SetActorRotation(PreviewRotation);
+}
+
+void ASICharacter::UpdateHoveredShape()
+{
+	if (PreviewActor && !CurrentPreviewShapeId.IsNone())
+	{
+		SetHoveredShape(nullptr);
+		return;
+	}
+
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	
+	AController* PlayerController = GetController();
+	if (IsValid(PlayerController) == false)
+	{
+		return;
+	}
+	
+	PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+	const FVector TraceStart = ViewLocation;
+	const FVector TraceEnd = TraceStart + (ViewRotation.Vector() * EditTraceDistance);
+
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(UpdateHoveredShape), false, this);
+
+	APlacedShapeActor* NewHoveredShape = nullptr;
+	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+	{
+		NewHoveredShape = Cast<APlacedShapeActor>(HitResult.GetActor());
+		if (NewHoveredShape && NewHoveredShape->IsBeingEdited())
+		{
+			NewHoveredShape = nullptr;
+		}
+	}
+
+	SetHoveredShape(NewHoveredShape);
+}
+
+void ASICharacter::SetHoveredShape(APlacedShapeActor* NewHoveredShape)
+{
+	if (HoveredShape == NewHoveredShape)
+	{
+		return;
+	}
+
+	if (HoveredShape)
+	{
+		HoveredShape->SetHovered(false);
+	}
+
+	HoveredShape = NewHoveredShape;
+
+	if (HoveredShape)
+	{
+		HoveredShape->SetHovered(true);
+	}
+}
+
+void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTransform)
+{
+	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PreviewActorClass)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (!PreviewActor)
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		PreviewActor = World->SpawnActor<APlacementPreviewActor>(PreviewActorClass, PreviewTransform, SpawnParameters);
+	}
+
+	if (PreviewActor && PreviewActor->SetPreviewShape(ShapeDefinitionTable, ShapeId))
+	{
+		SetHoveredShape(nullptr);
+		CurrentPreviewShapeId = ShapeId;
+		bIsEditingExistingShape = true;
+		EditingOriginalShapeId = ShapeId;
+		EditingOriginalTransform = PreviewTransform;
+		PreviewRotation = PreviewTransform.GetRotation();
+
+		FVector ViewLocation;
+		FRotator ViewRotation;
+		AController* PlayerController = GetController();
+		if (IsValid(PlayerController) == false)
+		{
+			return;
+		}
+	
+		PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+		const float ProjectedDistance = FVector::DotProduct(PreviewTransform.GetLocation() - ViewLocation, ViewRotation.Vector());
+		PreviewDistance = FMath::Clamp(ProjectedDistance, MinPreviewDistance, MaxPreviewDistance);
+
+		PreviewActor->SetActorTransform(PreviewTransform);
+	}
+}
+
+void ASICharacter::ClearPreview()
+{
+	if (PreviewActor)
+	{
+		PreviewActor->Destroy();
+		PreviewActor = nullptr;
+	}
+
+	CurrentPreviewShapeId = NAME_None;
+	PreviewRotation = FQuat::Identity;
+	bIsEditingExistingShape = false;
+	EditingOriginalShapeId = NAME_None;
+	EditingOriginalTransform = FTransform::Identity;
+}
+
+void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform)
+{
+	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
+	{
+		return;
+	}
+
+	const FShapeDefinitionRow* ShapeDefinition = ShapeDefinitionTable->FindRow<FShapeDefinitionRow>(ShapeId, TEXT("Server_RequestSpawnShape"));
+	if (!ShapeDefinition || !ShapeDefinition->Mesh)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.Instigator = this;
+
+	APlacedShapeActor* PlacedShape = World->SpawnActor<APlacedShapeActor>(PlacedShapeActorClass, SpawnTransform, SpawnParameters);
+	if (PlacedShape)
+	{
+		PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId);
+	}
+}
+
+void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* TargetShape)
+{
+	APawn* ControlledPawn = this;
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	AController* PlayerController = GetController();
+	if (IsValid(PlayerController) == false)
+	{
+		return;
+	}
+	
+	PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+	const FVector TraceStart = ViewLocation;
+	const FVector TraceEnd = TraceStart + (ViewRotation.Vector() * EditTraceDistance);
+
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ServerRequestEditShape), false, ControlledPawn);
+
+	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+	{
+		TargetShape = Cast<APlacedShapeActor>(HitResult.GetActor());
+	}
+
+	if (!TargetShape || TargetShape->IsBeingEdited())
+	{
+		return;
+	}
+
+	const FName ShapeId = TargetShape->GetShapeId();
+	if (ShapeId.IsNone())
+	{
+		return;
+	}
+
+	const float DistanceSquared = FVector::DistSquared(ControlledPawn->GetActorLocation(), TargetShape->GetActorLocation());
+	if (DistanceSquared > FMath::Square(MaxEditDistance))
+	{
+		return;
+	}
+
+	const FTransform PreviewTransform = TargetShape->GetActorTransform();
+	TargetShape->SetBeingEdited(true);
+	TargetShape->Destroy();
+
+	Client_StartEditShape(ShapeId, PreviewTransform);
+}
+
+void ASICharacter::Client_StartEditShape_Implementation(FName ShapeId, FTransform PreviewTransform)
+{
+	StartEditPreview(ShapeId, PreviewTransform);
 }
 
 #pragma endregion
