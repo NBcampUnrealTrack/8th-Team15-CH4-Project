@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "SICharacter.generated.h"
 
+class APlacedShapeActor;
+class APlacementPreviewActor;
 class USIUserWidget;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
@@ -66,6 +68,13 @@ private:
 	// 액터 변형 UI 모드 전환
 	void ToggleTransformUI();
 	
+	// Preview 관련 인풋
+	void StartBoxPreview();
+	void ConfirmPlacement();
+	void CancelPreview();
+	void IncreasePreviewDistance();
+	void DecreasePreviewDistance();
+	
 protected:
 	// 플레이어 인풋 IA 식별자 데이터 에셋
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
@@ -101,6 +110,72 @@ private:
 	bool bIsUIOnlyMode = false;
 	// UI Visble 변수
 	bool bIsUIVisible = false;
+	
+#pragma endregion
+	
+#pragma region Object
+	
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	TObjectPtr<UDataTable> ShapeDefinitionTable;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	TSubclassOf<APlacementPreviewActor> PreviewActorClass;
+	
+	UPROPERTY()
+	TObjectPtr<APlacementPreviewActor> PreviewActor;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	TSubclassOf<APlacedShapeActor> PlacedShapeActorClass;
+
+	UPROPERTY()
+	TObjectPtr<APlacedShapeActor> HoveredShape;
+	
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	float PreviewDistance;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	float MinPreviewDistance;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	float MaxPreviewDistance;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	float PreviewDistanceStep;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	float EditTraceDistance;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
+	float MaxEditDistance;
+	
+private:
+	FName CurrentPreviewShapeId;
+	FQuat PreviewRotation;
+	bool bIsEditingExistingShape;
+	FName EditingOriginalShapeId;
+	FTransform EditingOriginalTransform;
+	
+public:
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void StartShapePreview(FName ShapeId);
+	
+private:
+	void UpdatePreviewTransform();
+	void UpdateHoveredShape();
+	void SetHoveredShape(APlacedShapeActor* NewHoveredShape);
+	void StartEditPreview(FName ShapeId, const FTransform& PreviewTransform);
+	void ClearPreview();
+	
+	UFUNCTION(Server, Reliable)
+	void Server_RequestSpawnShape(FName ShapeId, FTransform SpawnTransform);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestEditShape(APlacedShapeActor* TargetShape);
+
+	UFUNCTION(Client, Reliable)
+	void Client_StartEditShape(FName ShapeId, FTransform PreviewTransform);
 	
 #pragma endregion
 	
