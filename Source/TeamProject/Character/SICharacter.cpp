@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/SICharacter.h"
@@ -17,7 +17,8 @@
 #include "Object/PlacedShapeActor.h"
 #include "Object/PlacementPreviewActor.h"
 #include "Object/ShapeDefinitionRow.h"
-#include "UI/DetailPanelWidget.h"
+#include "PlayerController/SIPlayerController.h"
+#include "UI/SIUserWidget.h"
 
 #pragma region ACharacter Override
 
@@ -80,20 +81,6 @@ void ASICharacter::BeginPlay()
 	
 	// PlayerCharacterInputMappingContext Mapping
 	Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 1);
-	
-	// 인스턴스가 없을 때, StaticClass만 존재한다면
-	if (!TransformWidgetInstance && TransformWidgetClass)
-	{
-		// StaticClass를 통해 Instance화
-		TransformWidgetInstance = CreateWidget<UDetailPanelWidget>(PlayerController, TransformWidgetClass);
-	}
-		
-	// 인스턴스가 존재한다면
-	if (TransformWidgetInstance)
-	{
-		// 뷰포트에 노출
-		TransformWidgetInstance->AddToViewport();
-	}
 }
 
 // Called every frame
@@ -269,7 +256,7 @@ void ASICharacter::HandleJumpNFly()
 
 void ASICharacter::ToggleUIOnlyMode()
 {
-	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
 	if (IsValid(PlayerController) == false)
 	{
 		return;
@@ -288,11 +275,11 @@ void ASICharacter::ToggleUIOnlyMode()
  
 		// 2. 입력 모드 설정 (이 시점에서 위젯 포커스 준비)
 		FInputModeGameAndUI InputMode;
-		InputMode.SetWidgetToFocus(TransformWidgetInstance->TakeWidget());
+		InputMode.SetWidgetToFocus(PlayerController->GetDetailPanelWidget()->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 		InputMode.SetHideCursorDuringCapture(false);
 		PlayerController->SetInputMode(InputMode);
- 
+		
 		// 3. 마지막에 커서를 노출 (이미 중앙으로 옮겨진 상태에서 등장)
 		PlayerController->bShowMouseCursor = true;
 	}
@@ -306,86 +293,6 @@ void ASICharacter::ToggleUIOnlyMode()
 	
 	// 모드 전환 시 박혀있던 키 입력들 초기화
 	PlayerController->FlushPressedKeys();	
-}
-
-void ASICharacter::ToggleTransformUI()
-{
-	APlayerController* PlayerController = Cast<APlayerController>(GetController());
-	if (IsValid(PlayerController) == false)
-	{
-		return;
-	}
-	
-	// UIVisible 전환
-	bIsUIVisible = !bIsUIVisible;
-	
-	// UI가 화면에 보여야한다면
-	if (bIsUIVisible)
-	{
-		// 인스턴스가 없을 때, StaticClass만 존재한다면
-		if (!TransformWidgetInstance && TransformWidgetClass)
-		{
-			// StaticClass를 통해 Instance화
-			TransformWidgetInstance = CreateWidget<UDetailPanelWidget>(PlayerController, TransformWidgetClass);
-		}
-		
-		// 인스턴스가 존재한다면
-		if (TransformWidgetInstance)
-		{
-			// 뷰포트에 노출
-			TransformWidgetInstance->AddToViewport();
-		}
-		
-		// UIOnly InputMode로 전환을 위한 변수
-		FInputModeUIOnly  InputMode;
-		// 입력 우선 TakeWidget로 Focus
-		InputMode.SetWidgetToFocus(TransformWidgetInstance->TakeWidget());
-		// 마우스를 게임 화면 내에 감금
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-		// UIOnly InputMode로 전환
-		PlayerController->SetInputMode(InputMode);
-		
-		// MouseCursor 노출
-		PlayerController->bShowMouseCursor = true;
-		// 기존 인풋컨테이너의 값들을 삭제
-		PlayerController->FlushPressedKeys();
-	}
-	else
-	{
-		// 인스턴스가 존재한다면
-		if (TransformWidgetInstance)
-		{
-			// 인스턴스 삭제
-			TransformWidgetInstance->RemoveFromParent();
-		}
-		
-		// GameOnly InputMode로 전환
-		FInputModeGameOnly InputMode;
-		PlayerController->SetInputMode(InputMode);
-		
-		// MouseCursor 비노출
-		PlayerController->bShowMouseCursor = false;
-	}
-}
-
-void ASICharacter::StartBoxPreview()
-{
-	StartShapePreview(TEXT("Box"));
-}
-
-void ASICharacter::StartSpherePreview()
-{
-	StartShapePreview(TEXT("Sphere"));
-}
-
-void ASICharacter::StartCylinderPreview()
-{
-	StartShapePreview(TEXT("Cylinder"));
-}
-
-void ASICharacter::StartConePreview()
-{
-	StartShapePreview(TEXT("Cone"));
 }
 
 void ASICharacter::ConfirmPlacement()

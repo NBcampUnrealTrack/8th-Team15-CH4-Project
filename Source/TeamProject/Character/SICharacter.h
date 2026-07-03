@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -8,7 +8,6 @@
 
 class APlacedShapeActor;
 class APlacementPreviewActor;
-class UDetailPanelWidget;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
 class UStaticMeshComponent;
@@ -65,9 +64,6 @@ private:
 	// UI Only Mode 전환
 	void ToggleUIOnlyMode();
 	
-	// 액터 변형 UI 모드 전환
-	void ToggleTransformUI();
-	
 	// Preview 관련 인풋
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartBoxPreview();
@@ -104,22 +100,13 @@ public:
 	
 #pragma region UI
 	
-protected:
-	// 액터 변형 관련 UI Widget Class
-	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<UDetailPanelWidget> TransformWidgetClass;
-	
-	// 액터 변형 관련 UI Widget Instance
-	UPROPERTY()
-	TObjectPtr<UDetailPanelWidget> TransformWidgetInstance;
-	
 private:
 	// UI Only Mode 변수
 	bool bIsUIOnlyMode = false;
 	// UI Visble 변수
 	bool bIsUIVisible = false;
 	
-#pragma endregion
+#pragma endregion 
 	
 #pragma region Object
 	
