@@ -1,40 +1,69 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "SIPlayerController.generated.h"
 
-class UDetailPanelWidget;
+// UI À§Á¬ Å¬·¡½º¸¦ »ç¿ëÇÏ±â À§ÇÑ Àü¹æ ¼±¾ð
+class UUserWidget;
 
+/**
+ * ÇÃ·¹ÀÌ¾îÀÇ ÀÔ·ÂÀ» Ã³¸®ÇÏ°í ¼­¹ö¿Í Åë½Å(RPC)ÇÏ´Â ÄÁÆ®·Ñ·¯ Å¬·¡½ºÀÔ´Ï´Ù.
+ */
 UCLASS()
 class TEAMPROJECT_API ASIPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
 public:
-	ASIPlayerController();
+	// ==========================================
+	// [Client -> Server] Á¤´äÀ» ¼­¹ö·Î Á¦ÃâÇÏ´Â RPC
+	// ==========================================
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game|Network")
+	void Server_SubmitAnswer(const FString& Answer);
 
-private:
-	virtual void ReceivedPlayer() override;
-	
-#pragma region UI
-	
+	// ==========================================
+	// [Server -> Client] ÃâÁ¦ÀÚ¿¡°Ô Á¤´ä(Á¦½Ã¾î)À» ¸ô·¡ ¾Ë·ÁÁÖ´Â RPC
+	// ==========================================
+	UFUNCTION(Client, Reliable)
+	void Client_ReceiveSecretWord(const FString& SecretWord);
+
+
+	// ==========================================
+	// [°³¹ßÀÚ¿ë Å×½ºÆ® ÄÜ¼Ö ¸í·É¾î (Exec)]
+	// ==========================================
+
+	UFUNCTION(Exec)
+	void TestAnswer(const FString& Answer);
+
+	UFUNCTION(Exec)
+	void SetPhase(int32 PhaseIndex);
+
+	UFUNCTION(Exec)
+	void SetTime(int32 Seconds);
+
+
+	// ==========================================
+	// [Test -> Server RPC] ÄÜ¼Ö ¸í·ÉÀ» ¼­¹ö¿¡ Àû¿ëÇÏ±â À§ÇÑ ÇÔ¼ö
+	// ==========================================
+
+	UFUNCTION(Server, Reliable)
+	void Server_TestSetPhase(int32 PhaseIndex);
+
+	UFUNCTION(Server, Reliable)
+	void Server_TestSetTime(int32 Seconds);
+
+
+	// ==========================================
+	// [UI ¿¬µ¿] Ä³¸¯ÅÍ(SICharacter) Ãø¿¡¼­ È£ÃâÇÒ ÇÔ¼ö
+	// ==========================================
+
+	/** µðÅ×ÀÏ ÆÐ³Î À§Á¬À» ¹ÝÈ¯ÇÕ´Ï´Ù. */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	UUserWidget* GetDetailPanelWidget() const;
+
 protected:
-	// ì•¡í„° ë³€í˜• ê´€ë ¨ UI Widget Class
-	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<UDetailPanelWidget> DetailPanelWidget;
-	
-	// ì•¡í„° ë³€í˜• ê´€ë ¨ UI Widget Instance
-	UPROPERTY()
-	TObjectPtr<UDetailPanelWidget> DetailPanelWidgetInstance;
-	
-public:
-	UDetailPanelWidget* GetDetailPanelWidget() const { return DetailPanelWidgetInstance; };
-	
-#pragma endregion
-	
+	/** ½ÇÁ¦ È­¸é¿¡ ¶ç¿öÁú µðÅ×ÀÏ ÆÐ³Î À§Á¬ ÀÎ½ºÅÏ½º (ºí·çÇÁ¸°Æ®¿¡¼­ »ý¼º ÈÄ ÇÒ´ç) */
+	UPROPERTY(BlueprintReadWrite, Category = "UI")
+	UUserWidget* DetailPanelWidget;
 };
-
-
