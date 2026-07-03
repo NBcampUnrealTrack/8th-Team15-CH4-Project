@@ -18,6 +18,7 @@
 #include "Object/PlacementPreviewActor.h"
 #include "Object/ShapeDefinitionRow.h"
 #include "PlayerController/SIPlayerController.h"
+#include "UI/DetailPanelWidget.h"
 #include "UI/SIUserWidget.h"
 
 #pragma region ACharacter Override
@@ -108,7 +109,7 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ToggleTransformUI, ETriggerEvent::Triggered, this, &ThisClass::ToggleUIOnlyMode);
 		
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Preview, ETriggerEvent::Started, this, &ThisClass::StartBoxPreview);
+		// EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Preview, ETriggerEvent::Started, this, &ThisClass::StartBoxPreview);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->IncreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::IncreasePreviewDistance);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->DecreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::DecreasePreviewDistance);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Started, this, &ThisClass::ConfirmPlacement);
@@ -293,6 +294,26 @@ void ASICharacter::ToggleUIOnlyMode()
 	
 	// 모드 전환 시 박혀있던 키 입력들 초기화
 	PlayerController->FlushPressedKeys();	
+}
+
+void ASICharacter::StartBoxPreview()
+{
+	StartShapePreview(TEXT("Box"));
+}
+
+void ASICharacter::StartSpherePreview()
+{
+	StartShapePreview(TEXT("Sphere"));
+}
+
+void ASICharacter::StartCylinderPreview()
+{
+	StartShapePreview(TEXT("Cylinder"));
+}	
+
+void ASICharacter::StartConePreview()
+{
+	StartShapePreview(TEXT("Cone"));
 }
 
 void ASICharacter::ConfirmPlacement()

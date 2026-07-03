@@ -8,16 +8,16 @@
 #include "GameFramework/Pawn.h"
 #include "InputCoreTypes.h"
 #include "Blueprint/UserWidget.h"
-#include "UI/SIUserWidget.h"
+#include "UI/DetailPanelWidget.h"
 
 ASIPlayerController::ASIPlayerController()
 {
 }
 
-void ASIPlayerController::BeginPlay()
+void ASIPlayerController::ReceivedPlayer()
 {
-	Super::BeginPlay();
-	
+	Super::ReceivedPlayer();
+
 	// 인스턴스가 없을 때, StaticClass만 존재한다면
 	if (!DetailPanelWidgetInstance && DetailPanelWidget)
 	{
@@ -31,13 +31,4 @@ void ASIPlayerController::BeginPlay()
 		// 뷰포트에 노출
 		DetailPanelWidgetInstance->AddToViewport();
 	}
-}
-
-void ASIPlayerController::ReceivedPlayer()
-{
-	Super::ReceivedPlayer();
-
-	DetailPanelWidget = CreateWidget<UDetailPanelWidget>(this, DetailPanelWidget);
-
-	DetailPanelWidget->AddToViewport();
 }

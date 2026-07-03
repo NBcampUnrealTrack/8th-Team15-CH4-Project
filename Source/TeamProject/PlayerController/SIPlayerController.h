@@ -15,9 +15,6 @@ class TEAMPROJECT_API ASIPlayerController : public APlayerController
 
 public:
 	ASIPlayerController();
-	
-protected:
-	virtual void BeginPlay() override;
 
 private:
 	virtual void ReceivedPlayer() override;
