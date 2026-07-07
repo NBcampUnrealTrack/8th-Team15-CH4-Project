@@ -1,3 +1,5 @@
+﻿// SIPlayerController.h
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -6,8 +8,9 @@
 
 
 class UDetailPanelWidget;
+
 /**
- * �÷��̾��� �Է��� ó���ϰ� ������ ���(RPC)�ϴ� ��Ʈ�ѷ� Ŭ�����Դϴ�.
+ * 플레이어의 입력을 처리하고 서버와 통신(RPC)하는 컨트롤러 클래스입니다.
  */
 UCLASS()
 class TEAMPROJECT_API ASIPlayerController : public APlayerController
@@ -18,20 +21,20 @@ class TEAMPROJECT_API ASIPlayerController : public APlayerController
 
 public:
 	// ==========================================
-	// [Client -> Server] ������ ������ �����ϴ� RPC
+	// [Client -> Server] 정답을 서버로 제출하는 RPC
 	// ==========================================
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game|Network")
 	void Server_SubmitAnswer(const FString& Answer);
 
 	// ==========================================
-	// [Server -> Client] �����ڿ��� ����(���þ�)�� ���� �˷��ִ� RPC
+	// [Server -> Client] 출제자에게 정답(제시어)을 몰래 알려주는 RPC
 	// ==========================================
 	UFUNCTION(Client, Reliable)
 	void Client_ReceiveSecretWord(const FString& SecretWord);
 
 
 	// ==========================================
-	// [�����ڿ� �׽�Ʈ �ܼ� ��ɾ� (Exec)]
+	// [개발자용 테스트 콘솔 명령어 (Exec)]
 	// ==========================================
 
 	UFUNCTION(Exec)
@@ -45,7 +48,7 @@ public:
 
 
 	// ==========================================
-	// [Test -> Server RPC] �ܼ� ����� ������ �����ϱ� ���� �Լ�
+	// [Test -> Server RPC] 콘솔 명령을 서버에 적용하기 위한 함수
 	// ==========================================
 
 	UFUNCTION(Server, Reliable)
@@ -53,12 +56,9 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_TestSetTime(int32 Seconds);
-	
+
 #pragma endregion 
 
-private:
-	virtual void ReceivedPlayer() override;
-	
 #pragma region UI
 
 protected:
@@ -72,6 +72,9 @@ protected:
 
 public:
 	UDetailPanelWidget* GetDetailPanelWidget() const { return DetailPanelWidgetInstance; };
+
+private:
+	virtual void ReceivedPlayer() override;
 
 #pragma endregion
 	

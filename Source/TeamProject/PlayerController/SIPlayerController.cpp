@@ -1,12 +1,14 @@
-#include "PlayerController/SIPlayerController.h" // ������ �ִٸ� "PlayerController/SIPlayerController.h"
-#include "GameMode/SIGameMode.h"         // ������ �ִٸ� "GameMode/SIGameMode.h"
-#include "GameState/SIGameState.h"        // ������ �ִٸ� "GameState/SIGameState.h"
-#include "UI/DetailPanelWidget.h"
+﻿// SIPlayerController.cpp
+
+#include "PlayerController/SIPlayerController.h" // 폴더가 있다면 "PlayerController/SIPlayerController.h"
+#include "GameMode/SIGameMode.h"         // 폴더가 있다면 "GameMode/SIGameMode.h"
+#include "GameState/SIGameState.h"        // 폴더가 있다면 "GameState/SIGameState.h"
+#include "UI/DetailPanelWidget.h" // 위젯 반환 기능을 위해 필수!
 
 #pragma region GameMode
 
 // ==========================================
-// [Client -> Server] ���� ���� ���� ������
+// [Client -> Server] 정답 제출 실제 구현부
 // ==========================================
 void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answer)
 {
@@ -16,44 +18,44 @@ void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answ
 		if (GameMode)
 		{
 			GameMode->OnAnswerSubmitted(this, Answer);
-			UE_LOG(LogTemp, Warning, TEXT("[����] Ŭ���̾�Ʈ�� ������ �ܾ� ����: %s"), *Answer);
+			UE_LOG(LogTemp, Warning, TEXT("[서버] 클라이언트가 제출한 단어 수신: %s"), *Answer);
 		}
 	}
 }
 
 // ==========================================
-// [Server -> Client] ���þ� ���� ���� ������
+// [Server -> Client] 제시어 수신 실제 구현부
 // ==========================================
 void ASIPlayerController::Client_ReceiveSecretWord_Implementation(const FString& SecretWord)
 {
 	UE_LOG(LogTemp, Warning, TEXT("====================================="));
-	UE_LOG(LogTemp, Warning, TEXT("[Ŭ���̾�Ʈ] ����� �̹� �� ���� ���þ�� [%s] �Դϴ�!"), *SecretWord);
+	UE_LOG(LogTemp, Warning, TEXT("[클라이언트] 당신의 이번 턴 출제 제시어는 [%s] 입니다!"), *SecretWord);
 	UE_LOG(LogTemp, Warning, TEXT("====================================="));
 }
 
 // ==========================================
-// [�׽�Ʈ �ܼ� ��ɾ�] 
+// [테스트 콘솔 명령어] 
 // ==========================================
 void ASIPlayerController::TestAnswer(const FString& Answer)
 {
-	UE_LOG(LogTemp, Warning, TEXT("�ֿܼ��� ���� ���� �õ� ��... ���� �ܾ�: %s"), *Answer);
+	UE_LOG(LogTemp, Warning, TEXT("콘솔에서 정답 제출 시도 중... 제출 단어: %s"), *Answer);
 	Server_SubmitAnswer(Answer);
 }
 
 void ASIPlayerController::SetPhase(int32 PhaseIndex)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[�׽�Ʈ] ������ ���� ��� ����: %d"), PhaseIndex);
+	UE_LOG(LogTemp, Warning, TEXT("[테스트] 페이즈 변경 명령 전송: %d"), PhaseIndex);
 	Server_TestSetPhase(PhaseIndex);
 }
 
 void ASIPlayerController::SetTime(int32 Seconds)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[�׽�Ʈ] Ÿ�̸� ���� ��� ����: %d��"), Seconds);
+	UE_LOG(LogTemp, Warning, TEXT("[테스트] 타이머 변경 명령 전송: %d초"), Seconds);
 	Server_TestSetTime(Seconds);
 }
 
 // ==========================================
-// [�׽�Ʈ RPC] ���ڵ� ���� ������ ���� ���� �α� ���
+// [테스트 RPC] 인코딩 에러 방지를 위해 영어 로그 사용
 // ==========================================
 void ASIPlayerController::Server_TestSetPhase_Implementation(int32 PhaseIndex)
 {
