@@ -30,6 +30,11 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	
+	// 서버에서 소유권이 설정될 때 호출
+	virtual void PossessedBy(AController* NewController) override;
+	
+	virtual void PostNetInit() override;
 
 public:	
 	// Called every frame
@@ -38,7 +43,13 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
 #pragma endregion 
+	
+protected:
+	// 가시성을 갱신하는 공통 함수
+	void UpdateMeshVisibility();
 	
 #pragma region Character Component
 	
@@ -80,6 +91,9 @@ private:
 	void IncreasePreviewDistance();
 	void DecreasePreviewDistance();
 	void ResetPreviewTransform();
+	
+	UFUNCTION(Server, Reliable)
+	void ServerRPCSetMovementMode(EMovementMode NewMovementMode);
 	
 protected:
 	// 플레이어 인풋 IA 식별자 데이터 에셋

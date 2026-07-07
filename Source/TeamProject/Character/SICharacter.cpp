@@ -106,7 +106,26 @@ void ASICharacter::BeginPlay()
 	// PlayerCharacterInputMappingContext Mapping
 	Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 1);
 
+	// 초기 가시성 설정
+	UpdateMeshVisibility();
+	
 	BindDetailPanelDelegates();
+}
+
+void ASICharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	
+	// 초기 가시성 설정
+	UpdateMeshVisibility();
+}
+
+void ASICharacter::PostNetInit()
+{
+	Super::PostNetInit();
+	
+	// 초기 가시성 설정
+	UpdateMeshVisibility();
 }
 
 // Called every frame
@@ -142,6 +161,34 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	}
 
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ThisClass::ResetPreviewTransform);
+}
+
+void ASICharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+}
+
+void ASICharacter::UpdateMeshVisibility()
+{
+	// 핵심: 이 캐릭터가 현재 로컬 플레이어에 의해 조종되는지 확인
+	bool bIsLocallyControlled = IsLocallyControlled();
+ 
+	if (ArmOnlyComp)
+	{
+		// 1. 소유자만 보게 설정 (기본 엔진 기능)
+		ArmOnlyComp->SetOnlyOwnerSee(true);
+        
+		// 2. 리슨 서버 프록시 문제를 해결하기 위한 수동 제거 (eliminate)
+		// 로컬 컨트롤 중이 아니면 게임에서 아예 숨깁니다.
+		ArmOnlyComp->SetHiddenInGame(!bIsLocallyControlled);
+	}
+ 
+	if (GetMesh())
+	{
+		// 3인칭 몸체 매쉬는 내 화면(1인칭)에서 숨기고 남들에게만 보이게 설정
+		GetMesh()->SetOwnerNoSee(true);
+	}
+
 }
 
 #pragma endregion 
@@ -269,6 +316,7 @@ void ASICharacter::HandleJumpNFly()
 				GetCharacterMovement()->SetMovementMode(MOVE_Falling);
 				GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("EMovementMode::MOVE_Falling"));
 			}
+
 		}
 	}
 	else
@@ -425,6 +473,12 @@ void ASICharacter::ResetPreviewTransform()
 	PreviewActor->SetActorRotation(PreviewRotation);
 	PreviewActor->SetActorScale3D(PreviewScale);
 	SyncDetailPanelToPreview();
+}
+
+void ASICharacter::ServerRPCSetMovementMode_Implementation(EMovementMode NewMovementMode)
+{
+	// NewMovementMode 상태로 전환
+	GetCharacterMovement()->SetMovementMode(NewMovementMode);
 }
 
 #pragma endregion
