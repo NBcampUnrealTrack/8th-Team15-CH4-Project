@@ -9,6 +9,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
+#include "InputCoreTypes.h"
 #include "Components/StaticMeshComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -20,6 +21,27 @@
 #include "PlayerController/SIPlayerController.h"
 #include "UI/DetailPanelWidget.h"
 #include "UI/SIUserWidget.h"
+
+namespace
+{
+	constexpr float PreviewRotationRangeDegrees = 180.0f;
+	constexpr float PreviewSliderMinValue = 0.0f;
+	constexpr float PreviewSliderMaxValue = 2.0f;
+	constexpr float PreviewSliderCenterValue = 1.0f;
+	constexpr float MinPreviewScale = 0.65f;
+	constexpr float MaxPreviewScale = 1.35f;
+
+	float RotationSliderValueToDegrees(float Value)
+	{
+		const float ClampedValue = FMath::Clamp(Value, PreviewSliderMinValue, PreviewSliderMaxValue);
+		return (ClampedValue - PreviewSliderCenterValue) * PreviewRotationRangeDegrees;
+	}
+
+	float ScaleSliderValueToScale(float Value)
+	{
+		return FMath::GetMappedRangeValueClamped(FVector2D(PreviewSliderMinValue, PreviewSliderMaxValue), FVector2D(MinPreviewScale, MaxPreviewScale), Value);
+	}
+}
 
 #pragma region ACharacter Override
 
@@ -52,7 +74,8 @@ ASICharacter::ASICharacter()
 	PreviewDistanceStep = 100.0f;
 	EditTraceDistance = 3000.0f;
 	MaxEditDistance = 3000.0f;
-	PreviewRotation = FQuat::Identity;
+	PreviewRotation = FRotator::ZeroRotator;
+	PreviewScale = FVector::OneVector;
 	bIsEditingExistingShape = false;
 	PreviewActorClass = APlacementPreviewActor::StaticClass();
 	PlacedShapeActorClass = APlacedShapeActor::StaticClass();
@@ -82,6 +105,8 @@ void ASICharacter::BeginPlay()
 	
 	// PlayerCharacterInputMappingContext Mapping
 	Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 1);
+
+	BindDetailPanelDelegates();
 }
 
 // Called every frame
@@ -115,6 +140,8 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Started, this, &ThisClass::ConfirmPlacement);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Cancel, ETriggerEvent::Started, this, &ThisClass::CancelPreview);
 	}
+
+	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ThisClass::ResetPreviewTransform);
 }
 
 #pragma endregion 
@@ -268,6 +295,7 @@ void ASICharacter::ToggleUIOnlyMode()
 	if (bIsUIOnlyMode)
 	{
 		GetCharacterMovement()->StopMovementImmediately();
+		BindDetailPanelDelegates();
  
 		// 1. 마우스 위치를 먼저 중앙으로 '예약' 세팅
 		int32 ViewportSizeX, ViewportSizeY;
@@ -366,6 +394,39 @@ void ASICharacter::DecreasePreviewDistance()
 	UpdatePreviewTransform();
 }
 
+
+//선택 상태가 아닐시 도형의 로테이트, 스케일 값 초기화 
+void ASICharacter::ResetPreviewTransform()
+{
+	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	//선택 상태일 시 도형 삭제
+	if (bIsEditingExistingShape)
+	{
+		ClearPreview();
+		return;
+	}
+
+	PreviewRotation = FRotator::ZeroRotator;
+	PreviewScale = FVector::OneVector;
+
+	if (ShapeDefinitionTable)
+	{
+		const FShapeDefinitionRow* ShapeDefinition = ShapeDefinitionTable->FindRow<FShapeDefinitionRow>(CurrentPreviewShapeId, TEXT("ResetPreviewTransform"));
+		if (ShapeDefinition)
+		{
+			PreviewScale = ShapeDefinition->DefaultScale;
+		}
+	}
+
+	PreviewActor->SetActorRotation(PreviewRotation);
+	PreviewActor->SetActorScale3D(PreviewScale);
+	SyncDetailPanelToPreview();
+}
+
 #pragma endregion
 
 #pragma region Obeject
@@ -394,12 +455,60 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 	{
 		SetHoveredShape(nullptr);
 		CurrentPreviewShapeId = ShapeId;
-		PreviewRotation = FQuat::Identity;
+		PreviewRotation = FRotator::ZeroRotator;
+		PreviewScale = PreviewActor->GetActorScale3D();
 		bIsEditingExistingShape = false;
 		EditingOriginalShapeId = NAME_None;
 		EditingOriginalTransform = FTransform::Identity;
 		UpdatePreviewTransform();
+		SyncDetailPanelToPreview();
 	}
+}
+
+void ASICharacter::BindDetailPanelDelegates()
+{
+	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UDetailPanelWidget* DetailPanel = PlayerController->GetDetailPanelWidget();
+	if (!DetailPanel)
+	{
+		return;
+	}
+
+	DetailPanel->OnRotationChanged.AddUniqueDynamic(this, &ASICharacter::HandlePreviewRotationChanged);
+	DetailPanel->OnScaleChanged.AddUniqueDynamic(this, &ASICharacter::HandlePreviewScaleChanged);
+
+	if (PreviewActor && !CurrentPreviewShapeId.IsNone())
+	{
+		SyncDetailPanelToPreview();
+	}
+	else
+	{
+		DetailPanel->SetTransformControlsEnabled(false);
+	}
+}
+
+void ASICharacter::SyncDetailPanelToPreview()
+{
+	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UDetailPanelWidget* DetailPanel = PlayerController->GetDetailPanelWidget();
+	if (!DetailPanel)
+	{
+		return;
+	}
+
+	DetailPanel->SetTransformControlsEnabled(true);
+	DetailPanel->SetRotationValues(PreviewRotation);
+	DetailPanel->SetScaleValues(PreviewScale);
 }
 
 void ASICharacter::UpdatePreviewTransform()
@@ -430,6 +539,7 @@ void ASICharacter::UpdatePreviewTransform()
 
 	PreviewActor->SetActorLocation(PreviewLocation);
 	PreviewActor->SetActorRotation(PreviewRotation);
+	PreviewActor->SetActorScale3D(PreviewScale);
 }
 
 void ASICharacter::UpdateHoveredShape()
@@ -517,7 +627,8 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 		bIsEditingExistingShape = true;
 		EditingOriginalShapeId = ShapeId;
 		EditingOriginalTransform = PreviewTransform;
-		PreviewRotation = PreviewTransform.GetRotation();
+		PreviewRotation = PreviewTransform.GetRotation().Rotator();
+		PreviewScale = PreviewTransform.GetScale3D();
 
 		FVector ViewLocation;
 		FRotator ViewRotation;
@@ -533,6 +644,9 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 		PreviewDistance = FMath::Clamp(ProjectedDistance, MinPreviewDistance, MaxPreviewDistance);
 
 		PreviewActor->SetActorTransform(PreviewTransform);
+		PreviewRotation = PreviewActor->GetActorRotation();
+		PreviewScale = PreviewActor->GetActorScale3D();
+		SyncDetailPanelToPreview();
 	}
 }
 
@@ -545,10 +659,77 @@ void ASICharacter::ClearPreview()
 	}
 
 	CurrentPreviewShapeId = NAME_None;
-	PreviewRotation = FQuat::Identity;
+	PreviewRotation = FRotator::ZeroRotator;
+	PreviewScale = FVector::OneVector;
 	bIsEditingExistingShape = false;
 	EditingOriginalShapeId = NAME_None;
 	EditingOriginalTransform = FTransform::Identity;
+
+	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UDetailPanelWidget* DetailPanel = PlayerController->GetDetailPanelWidget();
+	if (DetailPanel)
+	{
+		DetailPanel->SetTransformControlsEnabled(false);
+	}
+}
+
+void ASICharacter::HandlePreviewRotationChanged(EAxis::Type Axis, float Value)
+{
+	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	const float Degrees = RotationSliderValueToDegrees(Value);
+	FRotator PreviewRotator = PreviewRotation;
+	switch (Axis)
+	{
+	case EAxis::X:
+		PreviewRotator.Roll = Degrees;
+		break;
+	case EAxis::Y:
+		PreviewRotator.Pitch = Degrees;
+		break;
+	case EAxis::Z:
+		PreviewRotator.Yaw = Degrees;
+		break;
+	default:
+		return;
+	}
+
+	PreviewRotation = PreviewRotator;
+	PreviewActor->SetActorRotation(PreviewRotation);
+}
+
+void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
+{
+	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	const float SafeValue = ScaleSliderValueToScale(Value);
+	switch (Axis)
+	{
+	case EAxis::X:
+		PreviewScale.X = SafeValue;
+		break;
+	case EAxis::Y:
+		PreviewScale.Y = SafeValue;
+		break;
+	case EAxis::Z:
+		PreviewScale.Z = SafeValue;
+		break;
+	default:
+		return;
+	}
+
+	PreviewActor->SetActorScale3D(PreviewScale);
 }
 
 void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform)
@@ -577,7 +758,7 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 	APlacedShapeActor* PlacedShape = World->SpawnActor<APlacedShapeActor>(PlacedShapeActorClass, SpawnTransform, SpawnParameters);
 	if (PlacedShape)
 	{
-		PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId);
+		PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D());
 	}
 }
 

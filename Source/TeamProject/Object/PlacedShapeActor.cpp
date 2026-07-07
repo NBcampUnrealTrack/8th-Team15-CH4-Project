@@ -55,10 +55,26 @@ bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName S
 		return false;
 	}
 
+	return SetPlacedShape(ShapeDefinitionTable, ShapeId, ShapeDefinition->DefaultScale);
+}
+
+bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId, const FVector& PlacedScale)
+{
+	if (!ShapeDefinitionTable || ShapeId.IsNone())
+	{
+		return false;
+	}
+
+	const FShapeDefinitionRow* ShapeDefinition = ShapeDefinitionTable->FindRow<FShapeDefinitionRow>(ShapeId, TEXT("SetPlacedShape"));
+	if (!ShapeDefinition || !ShapeDefinition->Mesh)
+	{
+		return false;
+	}
+
 	ReplicatedShapeId = ShapeId;
 	ReplicatedMesh = ShapeDefinition->Mesh;
 	ReplicatedMaterial = ShapeDefinition->PlacedMaterial;
-	ReplicatedScale = ShapeDefinition->DefaultScale;
+	ReplicatedScale = PlacedScale;
 
 	ApplyShapeVisuals();
 	return true;

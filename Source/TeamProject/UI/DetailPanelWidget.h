@@ -25,6 +25,10 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnAxisValueChanged OnScaleChanged;
 
+	void SetRotationValues(const FRotator& Rotation);
+	void SetScaleValues(const FVector& Scale);
+	void SetTransformControlsEnabled(bool bEnabled);
+
 protected:
 	virtual void NativeConstruct() override;
 
@@ -60,6 +64,9 @@ private:
 	TObjectPtr<USlider> Scale_Z;
 
 private:
+	bool bIsSynchronizingValues = false;
+	bool bAreTransformControlsEnabled = false;
+
 	UFUNCTION()
 	void OnLocationXChanged(float Value);
 

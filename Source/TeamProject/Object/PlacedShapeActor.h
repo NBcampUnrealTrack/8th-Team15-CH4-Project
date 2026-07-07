@@ -23,6 +23,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId);
+	bool SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId, const FVector& PlacedScale);
 	FName GetShapeId() const;
 	bool IsBeingEdited() const;
 	void SetBeingEdited(bool bInIsBeingEdited);

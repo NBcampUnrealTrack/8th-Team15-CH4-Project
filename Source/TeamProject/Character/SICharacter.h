@@ -8,6 +8,7 @@
 
 class APlacedShapeActor;
 class APlacementPreviewActor;
+class UDetailPanelWidget;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
 class UStaticMeshComponent;
@@ -78,6 +79,7 @@ private:
 	void CancelPreview();
 	void IncreasePreviewDistance();
 	void DecreasePreviewDistance();
+	void ResetPreviewTransform();
 	
 protected:
 	// 플레이어 인풋 IA 식별자 데이터 에셋
@@ -147,7 +149,8 @@ protected:
 	
 private:
 	FName CurrentPreviewShapeId;
-	FQuat PreviewRotation;
+	FRotator PreviewRotation;
+	FVector PreviewScale;
 	bool bIsEditingExistingShape;
 	FName EditingOriginalShapeId;
 	FTransform EditingOriginalTransform;
@@ -157,11 +160,19 @@ public:
 	void StartShapePreview(FName ShapeId);
 	
 private:
+	void BindDetailPanelDelegates();
+	void SyncDetailPanelToPreview();
 	void UpdatePreviewTransform();
 	void UpdateHoveredShape();
 	void SetHoveredShape(APlacedShapeActor* NewHoveredShape);
 	void StartEditPreview(FName ShapeId, const FTransform& PreviewTransform);
 	void ClearPreview();
+
+	UFUNCTION()
+	void HandlePreviewRotationChanged(EAxis::Type Axis, float Value);
+
+	UFUNCTION()
+	void HandlePreviewScaleChanged(EAxis::Type Axis, float Value);
 	
 	UFUNCTION(Server, Reliable)
 	void Server_RequestSpawnShape(FName ShapeId, FTransform SpawnTransform);
