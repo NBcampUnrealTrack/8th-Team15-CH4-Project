@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -75,7 +75,11 @@ private:
 	void HandleJumpNFly();
 	// UI Only Mode 전환
 	void ToggleUIOnlyMode();
-	
+
+	//UI 토글 키 테스트 (TAB)
+	void OpenParticipants();
+	void CloseParticipants();
+
 	// Preview 관련 인풋
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartBoxPreview();

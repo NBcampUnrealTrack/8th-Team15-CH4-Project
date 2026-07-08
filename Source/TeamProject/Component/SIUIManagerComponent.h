@@ -33,9 +33,15 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, Category = "UI", meta = (AllowPrivateAccess = "true"))
 	TMap<EUIType, TSubclassOf<UUserWidget>> WidgetClasses;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UUserWidget>> WidgetStack;
+
+public:
+	void OpenWidget(EUIType Type);
+
+	void CloseWidget();
+
 };

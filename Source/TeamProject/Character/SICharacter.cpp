@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/SICharacter.h"
@@ -21,6 +21,7 @@
 #include "PlayerController/SIPlayerController.h"
 #include "UI/DetailPanelWidget.h"
 #include "UI/SIUserWidget.h"
+#include "Component/SIUIManagerComponent.h"
 
 namespace
 {
@@ -158,8 +159,11 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->DecreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::DecreasePreviewDistance);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Started, this, &ThisClass::ConfirmPlacement);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Cancel, ETriggerEvent::Started, this, &ThisClass::CancelPreview);
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ResetPreviewTransform, ETriggerEvent::Started, this, &ThisClass::ResetPreviewTransform);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Participants, ETriggerEvent::Started, this, &ThisClass::OpenParticipants);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Participants, ETriggerEvent::Completed, this, &ThisClass::CloseParticipants);
 	}
+
+	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ThisClass::ResetPreviewTransform);
 }
 
 void ASICharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -369,6 +373,42 @@ void ASICharacter::ToggleUIOnlyMode()
 	
 	// 모드 전환 시 박혀있던 키 입력들 초기화
 	PlayerController->FlushPressedKeys();	
+}
+
+void ASICharacter::OpenParticipants()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	if (!PC)
+	{
+		return;
+	}
+
+	USIUIManagerComponent* UIManagerComponent = PC->GetComponentByClass<USIUIManagerComponent>();
+
+	if (!UIManagerComponent)
+	{
+		return;
+	}
+	UIManagerComponent->OpenWidget(EUIType::Participants);
+}
+
+void ASICharacter::CloseParticipants()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	if (!PC)
+	{
+		return;
+	}
+
+	USIUIManagerComponent* UIManagerComponent = PC->GetComponentByClass<USIUIManagerComponent>();
+
+	if (!UIManagerComponent)
+	{
+		return;
+	}
+	UIManagerComponent->CloseWidget();
 }
 
 void ASICharacter::StartBoxPreview()

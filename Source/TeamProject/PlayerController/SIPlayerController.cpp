@@ -1,9 +1,16 @@
 ﻿// SIPlayerController.cpp
 
-#include "PlayerController/SIPlayerController.h" // 폴더가 있다면 "PlayerController/SIPlayerController.h"
-#include "GameMode/SIGameMode.h"         // 폴더가 있다면 "GameMode/SIGameMode.h"
-#include "GameState/SIGameState.h"        // 폴더가 있다면 "GameState/SIGameState.h"
-#include "UI/DetailPanelWidget.h" // 위젯 반환 기능을 위해 필수!
+#include "PlayerController/SIPlayerController.h"
+#include "Component//SIUIManagerComponent.h"
+#include "GameMode/SIGameMode.h"         
+#include "GameState/SIGameState.h"        
+#include "UI/DetailPanelWidget.h" 
+
+
+ASIPlayerController::ASIPlayerController()
+{
+	UIManagerComponent = CreateDefaultSubobject<USIUIManagerComponent>(TEXT("UIManagerComponent"));
+}
 
 #pragma region GameMode
 

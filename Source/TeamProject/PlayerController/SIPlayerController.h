@@ -8,6 +8,8 @@
 
 
 class UDetailPanelWidget;
+class USIUIManagerComponent;
+
 
 /**
  * 플레이어의 입력을 처리하고 서버와 통신(RPC)하는 컨트롤러 클래스입니다.
@@ -17,6 +19,10 @@ class TEAMPROJECT_API ASIPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 	
+public:
+	ASIPlayerController();
+
+
 #pragma region GameMode
 
 public:
@@ -60,7 +66,7 @@ public:
 #pragma endregion 
 
 #pragma region UI
-
+	//===== UI Test =====
 protected:
 	// 액터 변형 관련 UI Widget Class
 	UPROPERTY(EditAnywhere, Category = "UI")
@@ -76,6 +82,11 @@ public:
 private:
 	virtual void ReceivedPlayer() override;
 
+	// ==================
+
+private:
+	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
 #pragma endregion
 	
 
