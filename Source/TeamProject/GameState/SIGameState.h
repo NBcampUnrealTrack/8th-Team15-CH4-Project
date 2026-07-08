@@ -17,6 +17,8 @@ enum class ESIGamePhase : uint8
 // UI 블루프린트에 값이 변했음을 즉시 알려주기 위한 델리게이트 선언
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPhaseChangedSignature, ESIGamePhase, NewPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTimeUpdatedSignature, int32, NewTime);
+// ★ 추가: 우리가 구경하는 방 주인이 바뀔 때 UI에 알려주는 델리게이트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPresenterChangedSignature, class APlayerState*, NewPresenter);
 
 /**
  * 게임의 전반적인 상태(타이머, 현재 페이즈, 점수 등)를 모든 클라이언트와 동기화하는 클래스입니다.
@@ -61,18 +63,25 @@ public:
 	FOnTimeUpdatedSignature OnTimeUpdated;
 
 	// ==========================================
-	// [게임 데이터 동기화]
+	// [게임 데이터 동기화 (투어 관리)]
 	// ==========================================
 
-	// 현재 출제자 (도형을 만들었거나, 현재 작업 공간의 주인)
-	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
+	// ★ 수정: 방 주인이 바뀔 때마다 OnRep 함수를 통해 클라이언트 UI를 갱신하도록 변경
+	// (현재 우리가 구경하고 있는 작업 공간의 주인)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentPresenter, Transient, BlueprintReadOnly, Category = "GameData")
 	class APlayerState* CurrentPresenter;
 
-	// 현재 라운드 진행도 (몇 번째 플레이어의 턴인지)
+	UFUNCTION()
+	void OnRep_CurrentPresenter();
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnPresenterChangedSignature OnPresenterChanged;
+
+	// 현재 구경 중인 방의 순서 (예: 1번째 방, 2번째 방...)
 	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
 	int32 CurrentRound;
 
-	// 총 라운드 수 (총 플레이어 수와 동일하게 설정됨)
+	// 총 돌아야 할 방의 개수 (총 플레이어 수와 동일)
 	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
 	int32 TotalRounds;
 };

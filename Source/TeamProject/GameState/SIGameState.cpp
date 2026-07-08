@@ -37,3 +37,16 @@ void ASIGameState::OnRep_RemainingTime()
 	// 덕분에 클라이언트 UI 팀원은 매 틱(Tick)마다 검사할 필요 없이 이 이벤트만 받아서 화면의 숫자를 바꾸면 됩니다.
 	OnTimeUpdated.Broadcast(RemainingTime);
 }
+
+// ==========================================
+// ★ 새로 추가된 부분: 방 주인이 바뀌었을 때 클라이언트에서 실행되는 함수
+// ==========================================
+void ASIGameState::OnRep_CurrentPresenter()
+{
+	// UI 블루프린트에 만들어둔 이벤트 노드에 신호를 보냅니다.
+	// "방 주인이 CurrentPresenter로 바뀌었어! UI 텍스트 바꿔!"
+	if (OnPresenterChanged.IsBound())
+	{
+		OnPresenterChanged.Broadcast(CurrentPresenter);
+	}
+}
