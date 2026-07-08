@@ -251,7 +251,7 @@ void ASICharacter::Move(const FInputActionValue& InValue)
 		if (FloorResult.IsWalkableFloor() && FloorResult.FloorDist < 10.f) 
 		{
 			// Falling 상태로 변경
-			GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+			ServerRPCSetMovementMode(MOVE_Falling);
 			// 중력의 영향으로 덜컥 거리는 현상 방지
 			GetCharacterMovement()->Velocity.Z = 0.f;
 			GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("GetCharacterMovement()->SetMovementMode(MOVE_Falling)"));
@@ -307,7 +307,7 @@ void ASICharacter::HandleJumpNFly()
 			if (GetCharacterMovement()->MovementMode != MOVE_Flying)
 			{
 				// Fly 상태로 전환
-				GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+				ServerRPCSetMovementMode(MOVE_Flying);
 				// 캐릭터 Z값 이동속도 0으로 수정하여 기존 Z축 속도로 인한 예외 상황 방지
 				GetCharacterMovement()->Velocity.Z = 0.0f; 
 				GEngine->AddOnScreenDebugMessage(1, 5.0f, FColor::Red, TEXT("EMovementMode::MOVE_Flying"));
@@ -315,7 +315,7 @@ void ASICharacter::HandleJumpNFly()
 			else
 			{
 				// Falling 상태로 전환
-				GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+				ServerRPCSetMovementMode(MOVE_Falling);
 				GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("EMovementMode::MOVE_Falling"));
 			}
 
