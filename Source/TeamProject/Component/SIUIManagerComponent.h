@@ -18,6 +18,19 @@ enum class EUIType : uint8
 	Participants	// 참가자 목록 (TAB)
 };
 
+USTRUCT()
+struct FUIStackEntry
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	EUIType UIType;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> Widget;
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TEAMPROJECT_API USIUIManagerComponent : public UActorComponent
 {
@@ -37,7 +50,7 @@ private:
 	TMap<EUIType, TSubclassOf<UUserWidget>> WidgetClasses;
 
 	UPROPERTY()
-	TArray<TObjectPtr<UUserWidget>> WidgetStack;
+	TArray<FUIStackEntry> WidgetStack;
 
 public:
 	void OpenWidget(EUIType Type);

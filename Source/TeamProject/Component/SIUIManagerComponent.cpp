@@ -39,6 +39,16 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 		return;
 	}
 
+	if (WidgetStack.ContainsByPredicate(
+		[Type](const FUIStackEntry& Entry)
+			{
+			return Entry.UIType == Type;
+			}
+		))
+	{
+		return;
+	}
+
 	TObjectPtr<UUserWidget> NewWidget = CreateWidget<UUserWidget>(PC, *FoundClass);
 	
 	if (!IsValid(NewWidget))
@@ -48,7 +58,12 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 
 	NewWidget->AddToViewport();
 
-	WidgetStack.Add(NewWidget);
+	FUIStackEntry UIStackEntry;
+
+	UIStackEntry.UIType = Type;
+	UIStackEntry.Widget = NewWidget;
+
+	WidgetStack.Add(UIStackEntry);
 }
 
 void USIUIManagerComponent::CloseWidget()
@@ -58,7 +73,7 @@ void USIUIManagerComponent::CloseWidget()
 		return;
 	}
 
-	TObjectPtr<UUserWidget> TargetWidget = WidgetStack.Last();
+	TObjectPtr<UUserWidget> TargetWidget = WidgetStack.Last().Widget;
 
 	if (!IsValid(TargetWidget))
 	{

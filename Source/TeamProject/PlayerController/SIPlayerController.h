@@ -9,7 +9,9 @@
 
 class UDetailPanelWidget;
 class USIUIManagerComponent;
+class UMainMenuWidget;
 
+class UInputAction;
 
 /**
  * 플레이어의 입력을 처리하고 서버와 통신(RPC)하는 컨트롤러 클래스입니다.
@@ -66,7 +68,7 @@ public:
 #pragma endregion 
 
 #pragma region UI
-	//===== UI Test =====
+	//========== DrawingTool UI Test ==========
 protected:
 	// 액터 변형 관련 UI Widget Class
 	UPROPERTY(EditAnywhere, Category = "UI")
@@ -79,14 +81,39 @@ protected:
 public:
 	UDetailPanelWidget* GetDetailPanelWidget() const { return DetailPanelWidgetInstance; };
 
+	//========== MainMenuWidget ==========
 private:
-	virtual void ReceivedPlayer() override;
+	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UMainMenuWidget> MainMenuWidgetClass;;
 
-	// ==================
+private:
+	UFUNCTION()
+	void HandleCreateRoom();
 
+	UFUNCTION()
+	void HandleJoinRoom();
+
+	UFUNCTION()
+	void HandleQuit();
+
+	//========== Remove UI ==========
+	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> IA_UICancel;
+
+private:
+	void HandleCancel();
+
+	//========== UI VAR & FUNCS ==========
 private:
 	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
+
+private:
+	virtual void ReceivedPlayer() override;
+
+	virtual void SetupInputComponent() override;
+
+
 #pragma endregion
 	
 

@@ -5,7 +5,9 @@
 #include "GameMode/SIGameMode.h"         
 #include "GameState/SIGameState.h"        
 #include "UI/DetailPanelWidget.h" 
+#include "UI/MainMenuWidget.h"
 
+#include "EnhancedInputComponent.h"
 
 ASIPlayerController::ASIPlayerController()
 {
@@ -105,11 +107,33 @@ void ASIPlayerController::Server_TestSetTime_Implementation(int32 Seconds)
 
 #pragma endregion
 
+#pragma region UI
+
+void ASIPlayerController::HandleCreateRoom()
+{
+	UIManagerComponent->OpenWidget(EUIType::CreateRoom);
+}
+
+void ASIPlayerController::HandleJoinRoom()
+{
+	UIManagerComponent->OpenWidget(EUIType::RoomList);
+}
+
+void ASIPlayerController::HandleQuit()
+{
+	UIManagerComponent->OpenWidget(EUIType::Exit);
+}
+
+void ASIPlayerController::HandleCancel()
+{
+	UIManagerComponent->CloseWidget();
+}
+
 void ASIPlayerController::ReceivedPlayer()
 {
 	Super::ReceivedPlayer();
-	
-	// 인스턴스가 없을 때, StaticClass만 존재한다면
+
+	 //인스턴스가 없을 때, StaticClass만 존재한다면
 	if (!DetailPanelWidgetInstance && DetailPanelWidget)
 	{
 		// StaticClass를 통해 Instance화
@@ -122,4 +146,44 @@ void ASIPlayerController::ReceivedPlayer()
 		// 뷰포트에 노출
 		DetailPanelWidgetInstance->AddToViewport();
 	}
+	
+	// 메인메뉴 띄우고 바인딩하는 코드. 결과물 합치고 난 이후에 주석 해제하기.
+	//bShowMouseCursor = true;
+
+	//FInputModeGameAndUI InputMode;
+	//SetInputMode(InputMode);
+
+	//if (!IsLocalController())
+	//{
+	//	return;
+	//}
+
+	//TObjectPtr<UMainMenuWidget> MainMenuWidget = CreateWidget<UMainMenuWidget>(this, MainMenuWidgetClass);
+
+	//if (!IsValid(MainMenuWidget))
+	//{
+	//	return;
+	//}
+
+	//MainMenuWidget->OnClickedCreateRoomButton.AddDynamic(this, &ASIPlayerController::HandleCreateRoom);
+	//MainMenuWidget->OnClickedJoinRoomButton.AddDynamic(this, &ASIPlayerController::HandleJoinRoom);
+	//MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASIPlayerController::HandleQuit);
+
+	//MainMenuWidget->AddToViewport();
 }
+
+void ASIPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+
+	if (!EnhancedInputComponent)
+	{
+		return;
+	}
+
+	EnhancedInputComponent->BindAction(IA_UICancel, ETriggerEvent::Started, this, &ASIPlayerController::HandleCancel);
+}
+
+#pragma endregion
