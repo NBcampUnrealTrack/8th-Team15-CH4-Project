@@ -508,8 +508,7 @@ void ASICharacter::ResetPreviewTransform()
 		}
 	}
 
-	PreviewActor->SetActorRotation(PreviewRotation);
-	PreviewActor->SetActorScale3D(PreviewScale);
+	UpdatePreviewTransform();
 	SyncDetailPanelToPreview();
 }
 
@@ -523,6 +522,7 @@ void ASICharacter::ServerRPCSetMovementMode_Implementation(EMovementMode NewMove
 
 #pragma region Obeject
 
+// 선택한 도형의 배치 프리뷰를 시작한다.
 void ASICharacter::StartShapePreview(FName ShapeId)
 {
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PreviewActorClass)
@@ -557,6 +557,7 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 	}
 }
 
+// 디테일 패널 UI의 회전/스케일 변경 이벤트를 프리뷰 조작 함수에 연결한다.
 void ASICharacter::BindDetailPanelDelegates()
 {
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
@@ -584,6 +585,7 @@ void ASICharacter::BindDetailPanelDelegates()
 	}
 }
 
+// 현재 프리뷰의 회전/스케일 값을 디테일 패널 UI에 반영한다.
 void ASICharacter::SyncDetailPanelToPreview()
 {
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
@@ -603,6 +605,7 @@ void ASICharacter::SyncDetailPanelToPreview()
 	DetailPanel->SetScaleValues(PreviewScale);
 }
 
+// 플레이어 시선 기준으로 프리뷰 위치와 변형을 갱신한다.
 void ASICharacter::UpdatePreviewTransform()
 {
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
@@ -627,13 +630,20 @@ void ASICharacter::UpdatePreviewTransform()
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(UpdatePlacementPreview), false, this);
 
 	const bool bHit = GetWorld() && GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
-	const FVector PreviewLocation = bHit ? HitResult.ImpactPoint : TraceEnd;
-
-	PreviewActor->SetActorLocation(PreviewLocation);
-	PreviewActor->SetActorRotation(PreviewRotation);
-	PreviewActor->SetActorScale3D(PreviewScale);
+	if (bHit)
+	{
+		// 표면에 맞은 경우, 프리뷰 액터가 표면 법선 방향으로 도형 bounds만큼 밀어내도록 히트 정보를 넘긴다.
+		PreviewActor->SetSurfaceAlignedTransform(HitResult.ImpactPoint, HitResult.ImpactNormal, PreviewRotation, PreviewScale);
+	}
+	else
+	{
+		PreviewActor->SetActorLocation(TraceEnd);
+		PreviewActor->SetActorRotation(PreviewRotation);
+		PreviewActor->SetActorScale3D(PreviewScale);
+	}
 }
 
+// 시선에 들어온 편집 가능한 도형을 찾아 호버 상태를 갱신한다.
 void ASICharacter::UpdateHoveredShape()
 {
 	if (PreviewActor && !CurrentPreviewShapeId.IsNone())
@@ -672,6 +682,7 @@ void ASICharacter::UpdateHoveredShape()
 	SetHoveredShape(NewHoveredShape);
 }
 
+// 이전 호버 도형을 해제하고 새 호버 도형을 설정한다.
 void ASICharacter::SetHoveredShape(APlacedShapeActor* NewHoveredShape)
 {
 	if (HoveredShape == NewHoveredShape)
@@ -692,6 +703,7 @@ void ASICharacter::SetHoveredShape(APlacedShapeActor* NewHoveredShape)
 	}
 }
 
+// 기존에 배치된 도형을 프리뷰 상태로 전환해 편집을 시작한다.
 void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTransform)
 {
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PreviewActorClass)
@@ -742,6 +754,7 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 	}
 }
 
+// 현재 프리뷰를 제거하고 관련 상태와 UI를 초기화한다.
 void ASICharacter::ClearPreview()
 {
 	if (PreviewActor)
@@ -770,6 +783,7 @@ void ASICharacter::ClearPreview()
 	}
 }
 
+// 디테일 패널에서 변경된 회전 값을 프리뷰에 적용한다.
 void ASICharacter::HandlePreviewRotationChanged(EAxis::Type Axis, float Value)
 {
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
@@ -795,9 +809,10 @@ void ASICharacter::HandlePreviewRotationChanged(EAxis::Type Axis, float Value)
 	}
 
 	PreviewRotation = PreviewRotator;
-	PreviewActor->SetActorRotation(PreviewRotation);
+	UpdatePreviewTransform();
 }
 
+// 디테일 패널에서 변경된 스케일 값을 프리뷰에 적용한다.
 void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
 {
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
@@ -821,9 +836,10 @@ void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
 		return;
 	}
 
-	PreviewActor->SetActorScale3D(PreviewScale);
+	UpdatePreviewTransform();
 }
 
+// 서버에서 실제 배치 도형을 생성한다.
 void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform)
 {
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
@@ -854,6 +870,7 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 	}
 }
 
+// 서버에서 편집 대상 도형을 확인하고 편집 프리뷰 시작을 클라이언트에 요청한다.
 void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* TargetShape)
 {
 	APawn* ControlledPawn = this;
@@ -907,6 +924,7 @@ void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* Tar
 	Client_StartEditShape(ShapeId, PreviewTransform);
 }
 
+// 클라이언트에서 편집 프리뷰를 시작한다.
 void ASICharacter::Client_StartEditShape_Implementation(FName ShapeId, FTransform PreviewTransform)
 {
 	StartEditPreview(ShapeId, PreviewTransform);
