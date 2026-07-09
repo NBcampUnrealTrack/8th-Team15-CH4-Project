@@ -1,10 +1,10 @@
-﻿// CreateRoomWidget.h
+// SICreateRoomWidget.h
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UI/SIUserWidget.h"
-#include "CreateRoomWidget.generated.h"
+#include "SICreateRoomWidget.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnClickedBackButton);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnClickedCreateButton);
@@ -13,7 +13,7 @@ class UCheckBox;
 class UButton;
 
 UCLASS()
-class TEAMPROJECT_API UCreateRoomWidget : public USIUserWidget
+class TEAMPROJECT_API USICreateRoomWidget : public USIUserWidget
 {
 	GENERATED_BODY()
 

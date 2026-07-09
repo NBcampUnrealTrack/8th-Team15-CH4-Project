@@ -1,15 +1,15 @@
-﻿// UExitWidget.h
+// SIExitWidget.h
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UI/SIUserWidget.h"
-#include "ExitWidget.generated.h"
+#include "SIExitWidget.generated.h"
 
 class UButton;
 
 UCLASS()
-class TEAMPROJECT_API UExitWidget : public USIUserWidget
+class TEAMPROJECT_API USIExitWidget : public USIUserWidget
 {
 	GENERATED_BODY()
 

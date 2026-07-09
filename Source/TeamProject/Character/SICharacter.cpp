@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/SICharacter.h"
@@ -19,7 +19,7 @@
 #include "Object/PlacementPreviewActor.h"
 #include "Object/ShapeDefinitionRow.h"
 #include "PlayerController/SIPlayerController.h"
-#include "UI/DetailPanelWidget.h"
+#include "UI/SIDrawingToolWidget.h"
 #include "UI/SIUserWidget.h"
 #include "Component/SIUIManagerComponent.h"
 
@@ -354,7 +354,7 @@ void ASICharacter::ToggleUIOnlyMode()
  
 		// 2. 입력 모드 설정 (이 시점에서 위젯 포커스 준비)
 		FInputModeGameAndUI InputMode;
-		InputMode.SetWidgetToFocus(PlayerController->GetDetailPanelWidget()->TakeWidget());
+		InputMode.SetWidgetToFocus(PlayerController->GetDrawingToolWidget()->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 		InputMode.SetHideCursorDuringCapture(false);
 		PlayerController->SetInputMode(InputMode);
@@ -566,7 +566,7 @@ void ASICharacter::BindDetailPanelDelegates()
 		return;
 	}
 
-	UDetailPanelWidget* DetailPanel = PlayerController->GetDetailPanelWidget();
+	USIDrawingToolWidget* DetailPanel = PlayerController->GetDrawingToolWidget();
 	if (!DetailPanel)
 	{
 		return;
@@ -594,7 +594,7 @@ void ASICharacter::SyncDetailPanelToPreview()
 		return;
 	}
 
-	UDetailPanelWidget* DetailPanel = PlayerController->GetDetailPanelWidget();
+	USIDrawingToolWidget* DetailPanel = PlayerController->GetDrawingToolWidget();
 	if (!DetailPanel)
 	{
 		return;
@@ -776,7 +776,7 @@ void ASICharacter::ClearPreview()
 		return;
 	}
 
-	UDetailPanelWidget* DetailPanel = PlayerController->GetDetailPanelWidget();
+	USIDrawingToolWidget* DetailPanel = PlayerController->GetDrawingToolWidget();
 	if (DetailPanel)
 	{
 		DetailPanel->SetTransformControlsEnabled(false);

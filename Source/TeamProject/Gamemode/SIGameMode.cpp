@@ -6,8 +6,8 @@
 
 ASIGameMode::ASIGameMode()
 {
-	GameStateClass = ASIGameState::StaticClass();
-	PlayerControllerClass = ASIPlayerController::StaticClass();
+	/*GameStateClass = ASIGameState::StaticClass();
+	PlayerControllerClass = ASIPlayerController::StaticClass();*/
 
 	CurrentPresenterIndex = -1;
 }

@@ -1,4 +1,4 @@
-﻿// SIUIManagerComponent.h
+// SIUIManagerComponent.h
 
 #pragma once
 
@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "SIUIManagerComponent.generated.h"
 
-class UUserWidget;
+class USIUserWidget;
 
 UENUM()
 enum class EUIType : uint8
@@ -25,11 +25,13 @@ struct FUIStackEntry
 
 public:
 	UPROPERTY()
-	EUIType UIType;
+	EUIType UIType = EUIType::Exit;
 
 	UPROPERTY()
-	TObjectPtr<UUserWidget> Widget;
+	TObjectPtr<USIUserWidget> Widget;
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUIConfirmed, EUIType, type);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TEAMPROJECT_API USIUIManagerComponent : public UActorComponent
@@ -45,9 +47,19 @@ protected:
 public:	
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+public:
+	UPROPERTY()
+	FOnUIConfirmed OnUIConfirmed;
+
+private:
+	UFUNCTION()
+	void OnWidgetConfirmed();
+
+	UFUNCTION()
+	void OnWidgetCancelled();
 private:
 	UPROPERTY(EditAnywhere, Category = "UI", meta = (AllowPrivateAccess = "true"))
-	TMap<EUIType, TSubclassOf<UUserWidget>> WidgetClasses;
+	TMap<EUIType, TSubclassOf<USIUserWidget>> WidgetClasses;
 
 	UPROPERTY()
 	TArray<FUIStackEntry> WidgetStack;
@@ -56,5 +68,5 @@ public:
 	void OpenWidget(EUIType Type);
 
 	void CloseWidget();
-
+	
 };

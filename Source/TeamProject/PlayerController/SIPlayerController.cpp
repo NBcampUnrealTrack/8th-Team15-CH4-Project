@@ -1,11 +1,11 @@
-﻿// SIPlayerController.cpp
+// SIPlayerController.cpp
 
 #include "PlayerController/SIPlayerController.h"
 #include "Component//SIUIManagerComponent.h"
 #include "GameMode/SIGameMode.h"         
 #include "GameState/SIGameState.h"        
-#include "UI/DetailPanelWidget.h" 
-#include "UI/MainMenuWidget.h"
+#include "UI/SIDrawingToolWidget.h" 
+#include "UI/SIMainMenuWidget.h"
 
 #include "EnhancedInputComponent.h"
 
@@ -129,47 +129,54 @@ void ASIPlayerController::HandleCancel()
 	UIManagerComponent->CloseWidget();
 }
 
+void ASIPlayerController::HandleUIConfirmed(EUIType type)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[PC] UI Confirmed: %d"), (int32)type);
+}
+
 void ASIPlayerController::ReceivedPlayer()
 {
 	Super::ReceivedPlayer();
-
+	
 	 //인스턴스가 없을 때, StaticClass만 존재한다면
-	if (!DetailPanelWidgetInstance && DetailPanelWidget)
+	if (!DrawingToolWidgetInstance && DrawingToolWidget)
 	{
 		// StaticClass를 통해 Instance화
-		DetailPanelWidgetInstance = CreateWidget<UDetailPanelWidget>(this, DetailPanelWidget);
+		DrawingToolWidgetInstance = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidget);
 	}
 
 	// 인스턴스가 존재한다면
-	if (DetailPanelWidgetInstance)
+	if (DrawingToolWidgetInstance)
 	{
 		// 뷰포트에 노출
-		DetailPanelWidgetInstance->AddToViewport();
+		DrawingToolWidgetInstance->AddToViewport();
 	}
 	
 	// 메인메뉴 띄우고 바인딩하는 코드. 결과물 합치고 난 이후에 주석 해제하기.
-	//bShowMouseCursor = true;
+	/*bShowMouseCursor = true;
 
-	//FInputModeGameAndUI InputMode;
-	//SetInputMode(InputMode);
+	FInputModeGameAndUI InputMode;
+	SetInputMode(InputMode);
 
-	//if (!IsLocalController())
-	//{
-	//	return;
-	//}
+	if (!IsLocalController())
+	{
+		return;
+	}
 
-	//TObjectPtr<UMainMenuWidget> MainMenuWidget = CreateWidget<UMainMenuWidget>(this, MainMenuWidgetClass);
+	UIManagerComponent->OnUIConfirmed.AddDynamic(this, &ASIPlayerController::HandleUIConfirmed);
 
-	//if (!IsValid(MainMenuWidget))
-	//{
-	//	return;
-	//}
+	TObjectPtr<USIMainMenuWidget> MainMenuWidget = CreateWidget<USIMainMenuWidget>(this, MainMenuWidgetClass);
 
-	//MainMenuWidget->OnClickedCreateRoomButton.AddDynamic(this, &ASIPlayerController::HandleCreateRoom);
-	//MainMenuWidget->OnClickedJoinRoomButton.AddDynamic(this, &ASIPlayerController::HandleJoinRoom);
-	//MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASIPlayerController::HandleQuit);
+	if (!IsValid(MainMenuWidget))
+	{
+		return;
+	}
 
-	//MainMenuWidget->AddToViewport();
+	MainMenuWidget->OnClickedCreateRoomButton.AddDynamic(this, &ASIPlayerController::HandleCreateRoom);
+	MainMenuWidget->OnClickedJoinRoomButton.AddDynamic(this, &ASIPlayerController::HandleJoinRoom);
+	MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASIPlayerController::HandleQuit);
+
+	MainMenuWidget->AddToViewport();*/
 }
 
 void ASIPlayerController::SetupInputComponent()

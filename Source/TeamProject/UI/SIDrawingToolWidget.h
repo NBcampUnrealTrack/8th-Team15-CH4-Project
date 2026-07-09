@@ -1,17 +1,17 @@
-﻿// DetailPanelWidget.h
+// SIDrawingToolWidget.h
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UI/SIUserWidget.h"
-#include "DetailPanelWidget.generated.h"
+#include "SIDrawingToolWidget.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAxisValueChanged, EAxis::Type, Axis, float, Value);
 
 class USlider;
 
 UCLASS()
-class TEAMPROJECT_API UDetailPanelWidget : public USIUserWidget
+class TEAMPROJECT_API USIDrawingToolWidget : public USIUserWidget
 {
 	GENERATED_BODY()
 	

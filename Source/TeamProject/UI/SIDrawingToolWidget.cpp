@@ -1,7 +1,7 @@
-﻿// DetailPanelWidget.cpp
+// SIDrawingToolWidget.cpp
 
 
-#include "UI/DetailPanelWidget.h"
+#include "UI/SIDrawingToolWidget.h"
 #include "Components/Slider.h"
 
 namespace
@@ -44,56 +44,56 @@ namespace
 	}
 }
 
-void UDetailPanelWidget::NativeConstruct()
+void USIDrawingToolWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
 	ConfigureSlider(Location_X);
 	if (Location_X)
 	{
-		Location_X->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnLocationXChanged);
+		Location_X->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnLocationXChanged);
 	}
 	ConfigureSlider(Location_Y);
 	if (Location_Y)
 	{
-		Location_Y->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnLocationYChanged);
+		Location_Y->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnLocationYChanged);
 	}
 	ConfigureSlider(Location_Z);
 	if (Location_Z)
 	{
-		Location_Z->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnLocationZChanged);
+		Location_Z->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnLocationZChanged);
 	}
 
 	ConfigureSlider(Rotation_X);
 	if (Rotation_X)
 	{
-		Rotation_X->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnRotationXChanged);
+		Rotation_X->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnRotationXChanged);
 	}
 	ConfigureSlider(Rotation_Y);
 	if (Rotation_Y)
 	{
-		Rotation_Y->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnRotationYChanged);
+		Rotation_Y->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnRotationYChanged);
 	}
 	ConfigureSlider(Rotation_Z);
 	if (Rotation_Z)
 	{
-		Rotation_Z->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnRotationZChanged);
+		Rotation_Z->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnRotationZChanged);
 	}
 
 	ConfigureSlider(Scale_X);
 	if (Scale_X)
 	{
-		Scale_X->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnScaleXChanged);
+		Scale_X->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnScaleXChanged);
 	}
 	ConfigureSlider(Scale_Y);
 	if (Scale_Y)
 	{
-		Scale_Y->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnScaleYChanged);
+		Scale_Y->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnScaleYChanged);
 	}
 	ConfigureSlider(Scale_Z);
 	if (Scale_Z)
 	{
-		Scale_Z->OnValueChanged.AddDynamic(this, &UDetailPanelWidget::OnScaleZChanged);
+		Scale_Z->OnValueChanged.AddDynamic(this, &USIDrawingToolWidget::OnScaleZChanged);
 	}
 
 	SetTransformControlsEnabled(false);
@@ -101,7 +101,7 @@ void UDetailPanelWidget::NativeConstruct()
 
 //일단 Location은 뺐습니다.
 
-void UDetailPanelWidget::SetRotationValues(const FRotator& Rotation)
+void USIDrawingToolWidget::SetRotationValues(const FRotator& Rotation)
 {
 	bIsSynchronizingValues = true;
 
@@ -121,7 +121,7 @@ void UDetailPanelWidget::SetRotationValues(const FRotator& Rotation)
 	bIsSynchronizingValues = false;
 }
 
-void UDetailPanelWidget::SetScaleValues(const FVector& Scale)
+void USIDrawingToolWidget::SetScaleValues(const FVector& Scale)
 {
 	bIsSynchronizingValues = true;
 
@@ -141,7 +141,7 @@ void UDetailPanelWidget::SetScaleValues(const FVector& Scale)
 	bIsSynchronizingValues = false;
 }
 
-void UDetailPanelWidget::SetTransformControlsEnabled(bool bEnabled)
+void USIDrawingToolWidget::SetTransformControlsEnabled(bool bEnabled)
 {
 	bAreTransformControlsEnabled = bEnabled;
 
@@ -189,7 +189,7 @@ void UDetailPanelWidget::SetTransformControlsEnabled(bool bEnabled)
 	}
 }
 
-void UDetailPanelWidget::OnLocationXChanged(float Value)
+void USIDrawingToolWidget::OnLocationXChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -199,7 +199,7 @@ void UDetailPanelWidget::OnLocationXChanged(float Value)
 	OnLocationChanged.Broadcast(EAxis::X, Value);
 }
 
-void UDetailPanelWidget::OnLocationYChanged(float Value)
+void USIDrawingToolWidget::OnLocationYChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -209,7 +209,7 @@ void UDetailPanelWidget::OnLocationYChanged(float Value)
 	OnLocationChanged.Broadcast(EAxis::Y, Value);
 }
 
-void UDetailPanelWidget::OnLocationZChanged(float Value)
+void USIDrawingToolWidget::OnLocationZChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -219,7 +219,7 @@ void UDetailPanelWidget::OnLocationZChanged(float Value)
 	OnLocationChanged.Broadcast(EAxis::Z, Value);
 }
 
-void UDetailPanelWidget::OnRotationXChanged(float Value)
+void USIDrawingToolWidget::OnRotationXChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -229,7 +229,7 @@ void UDetailPanelWidget::OnRotationXChanged(float Value)
 	OnRotationChanged.Broadcast(EAxis::X, ClampSliderValue(Value));
 }
 
-void UDetailPanelWidget::OnRotationYChanged(float Value)
+void USIDrawingToolWidget::OnRotationYChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -239,7 +239,7 @@ void UDetailPanelWidget::OnRotationYChanged(float Value)
 	OnRotationChanged.Broadcast(EAxis::Y, ClampSliderValue(Value));
 }
 
-void UDetailPanelWidget::OnRotationZChanged(float Value)
+void USIDrawingToolWidget::OnRotationZChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -249,7 +249,7 @@ void UDetailPanelWidget::OnRotationZChanged(float Value)
 	OnRotationChanged.Broadcast(EAxis::Z, ClampSliderValue(Value));
 }
 
-void UDetailPanelWidget::OnScaleXChanged(float Value)
+void USIDrawingToolWidget::OnScaleXChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -259,7 +259,7 @@ void UDetailPanelWidget::OnScaleXChanged(float Value)
 	OnScaleChanged.Broadcast(EAxis::X, ClampSliderValue(Value));
 }
 
-void UDetailPanelWidget::OnScaleYChanged(float Value)
+void USIDrawingToolWidget::OnScaleYChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{
@@ -269,7 +269,7 @@ void UDetailPanelWidget::OnScaleYChanged(float Value)
 	OnScaleChanged.Broadcast(EAxis::Y, ClampSliderValue(Value));
 }
 
-void UDetailPanelWidget::OnScaleZChanged(float Value)
+void USIDrawingToolWidget::OnScaleZChanged(float Value)
 {
 	if (bIsSynchronizingValues || !bAreTransformControlsEnabled)
 	{

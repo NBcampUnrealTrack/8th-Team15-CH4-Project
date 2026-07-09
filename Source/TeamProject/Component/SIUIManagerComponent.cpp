@@ -1,9 +1,9 @@
-﻿// SIUIManagerComponent.cpp
+// SIUIManagerComponent.cpp
 
 
 #include "Component/SIUIManagerComponent.h"
 
-#include "Blueprint/UserWidget.h"
+#include "UI/SIUserWidget.h"
 #include "GameFramework/PlayerController.h"
 
 USIUIManagerComponent::USIUIManagerComponent()
@@ -14,13 +14,21 @@ USIUIManagerComponent::USIUIManagerComponent()
 void USIUIManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 void USIUIManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+}
 
+void USIUIManagerComponent::OnWidgetConfirmed()
+{
+	if (WidgetStack.IsEmpty())
+	{
+		return;
+	}
+
+	OnUIConfirmed.Broadcast(WidgetStack.Last().UIType);
 }
 
 void USIUIManagerComponent::OpenWidget(EUIType Type)
@@ -32,7 +40,7 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 		return;
 	}
 
-	TSubclassOf<UUserWidget>* FoundClass = WidgetClasses.Find(Type);
+	TSubclassOf<USIUserWidget>* FoundClass = WidgetClasses.Find(Type);
 
 	if (!FoundClass || !*FoundClass)
 	{
@@ -49,7 +57,7 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 		return;
 	}
 
-	TObjectPtr<UUserWidget> NewWidget = CreateWidget<UUserWidget>(PC, *FoundClass);
+	TObjectPtr<USIUserWidget> NewWidget = CreateWidget<USIUserWidget>(PC, *FoundClass);
 	
 	if (!IsValid(NewWidget))
 	{
@@ -57,6 +65,8 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 	}
 
 	NewWidget->AddToViewport();
+	NewWidget->OnConfirmed.AddDynamic(this, &USIUIManagerComponent::OnWidgetConfirmed);
+	NewWidget->OnCancelled.AddDynamic(this, &USIUIManagerComponent::OnWidgetCancelled);
 
 	FUIStackEntry UIStackEntry;
 
@@ -73,15 +83,23 @@ void USIUIManagerComponent::CloseWidget()
 		return;
 	}
 
-	TObjectPtr<UUserWidget> TargetWidget = WidgetStack.Last().Widget;
+	TObjectPtr<USIUserWidget> TargetWidget = WidgetStack.Last().Widget;
 
 	if (!IsValid(TargetWidget))
 	{
 		return;
 	}
 
+	TargetWidget->OnConfirmed.RemoveDynamic(this, &USIUIManagerComponent::OnWidgetConfirmed);
+	TargetWidget->OnCancelled.RemoveDynamic(this, &USIUIManagerComponent::OnWidgetCancelled);
+
 	TargetWidget->RemoveFromParent();
 
 	WidgetStack.Pop();
+}
+
+void USIUIManagerComponent::OnWidgetCancelled()
+{
+	CloseWidget();
 }
 

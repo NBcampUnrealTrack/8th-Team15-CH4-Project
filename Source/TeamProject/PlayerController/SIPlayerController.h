@@ -1,17 +1,19 @@
-﻿// SIPlayerController.h
+// SIPlayerController.h
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Component/SIUIManagerComponent.h"
 #include "SIPlayerController.generated.h"
 
 
-class UDetailPanelWidget;
+class USIDrawingToolWidget;
 class USIUIManagerComponent;
-class UMainMenuWidget;
+class USIMainMenuWidget;
 
 class UInputAction;
+
 
 /**
  * 플레이어의 입력을 처리하고 서버와 통신(RPC)하는 컨트롤러 클래스입니다.
@@ -72,19 +74,19 @@ public:
 protected:
 	// 액터 변형 관련 UI Widget Class
 	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<UDetailPanelWidget> DetailPanelWidget;
+	TSubclassOf<USIDrawingToolWidget> DrawingToolWidget;
 
 	// 액터 변형 관련 UI Widget Instance
 	UPROPERTY()
-	TObjectPtr<UDetailPanelWidget> DetailPanelWidgetInstance;
+	TObjectPtr<USIDrawingToolWidget> DrawingToolWidgetInstance;
 
 public:
-	UDetailPanelWidget* GetDetailPanelWidget() const { return DetailPanelWidgetInstance; };
+	USIDrawingToolWidget* GetDrawingToolWidget() const { return DrawingToolWidgetInstance; };
 
 	//========== MainMenuWidget ==========
 private:
 	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<UMainMenuWidget> MainMenuWidgetClass;;
+	TSubclassOf<USIMainMenuWidget> MainMenuWidgetClass;;
 
 private:
 	UFUNCTION()
@@ -95,6 +97,10 @@ private:
 
 	UFUNCTION()
 	void HandleQuit();
+
+	//========== LobbySettingWidget ==========
+private:
+	TSubclassOf<USIUserWidget> LobbySettingWidgetClass;
 
 	//========== Remove UI ==========
 	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
@@ -107,6 +113,11 @@ private:
 private:
 	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
+
+private:
+	UFUNCTION()
+	void HandleUIConfirmed(EUIType type);
+
 
 private:
 	virtual void ReceivedPlayer() override;
