@@ -1,5 +1,6 @@
 // SIPlayerController.cpp
 
+
 #include "PlayerController/SIPlayerController.h"
 #include "Component//SIUIManagerComponent.h"
 #include "GameMode/SIGameMode.h"         
@@ -139,21 +140,21 @@ void ASIPlayerController::ReceivedPlayer()
 	Super::ReceivedPlayer();
 	
 	 //인스턴스가 없을 때, StaticClass만 존재한다면
-	if (!DrawingToolWidgetInstance && DrawingToolWidget)
-	{
-		// StaticClass를 통해 Instance화
-		DrawingToolWidgetInstance = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidget);
-	}
+	//if (!DrawingToolWidgetInstance && DrawingToolWidget)
+	//{
+	//	// StaticClass를 통해 Instance화
+	//	DrawingToolWidgetInstance = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidget);
+	//}
 
-	// 인스턴스가 존재한다면
-	if (DrawingToolWidgetInstance)
-	{
-		// 뷰포트에 노출
-		DrawingToolWidgetInstance->AddToViewport();
-	}
+	//// 인스턴스가 존재한다면
+	//if (DrawingToolWidgetInstance)
+	//{
+	//	// 뷰포트에 노출
+	//	DrawingToolWidgetInstance->AddToViewport();
+	//}
 	
 	// 메인메뉴 띄우고 바인딩하는 코드. 결과물 합치고 난 이후에 주석 해제하기.
-	/*bShowMouseCursor = true;
+	bShowMouseCursor = true;
 
 	FInputModeGameAndUI InputMode;
 	SetInputMode(InputMode);
@@ -176,7 +177,7 @@ void ASIPlayerController::ReceivedPlayer()
 	MainMenuWidget->OnClickedJoinRoomButton.AddDynamic(this, &ASIPlayerController::HandleJoinRoom);
 	MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASIPlayerController::HandleQuit);
 
-	MainMenuWidget->AddToViewport();*/
+	MainMenuWidget->AddToViewport();
 }
 
 void ASIPlayerController::SetupInputComponent()
