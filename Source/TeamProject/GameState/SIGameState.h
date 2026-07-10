@@ -8,7 +8,8 @@
 UENUM(BlueprintType)
 enum class ESIGamePhase : uint8
 {
-	None UMETA(DisplayName = "대기 중"),
+	None UMETA(DisplayName = "시작 단계"),
+	LobbyPhase UMETA(DisplayName = "로비 단계"),
 	BuildPhase UMETA(DisplayName = "제작 단계"),
 	GuessPhase UMETA(DisplayName = "정답 맞추기 단계"),
 	ResultPhase UMETA(DisplayName = "결과 발표")

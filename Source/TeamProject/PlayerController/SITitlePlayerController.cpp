@@ -1,0 +1,86 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "SITitlePlayerController.h"
+
+#include "EnhancedInputComponent.h"
+#include "Component/SIUIManagerComponent.h"
+#include "GameInstance/SIGameInstance.h"
+#include "UI/SICreateRoomWidget.h"
+#include "UI/SIMainMenuWidget.h"
+
+ASITitlePlayerController::ASITitlePlayerController()
+{
+	UIManagerComponent = CreateDefaultSubobject<USIUIManagerComponent>(TEXT("UIManagerComponent"));
+}
+
+void ASITitlePlayerController::ReceivedPlayer()
+{
+	Super::ReceivedPlayer();
+	
+	// 메인메뉴 띄우고 바인딩하는 코드. 결과물 합치고 난 이후에 주석 해제하기.
+	bShowMouseCursor = true;
+
+	FInputModeGameAndUI InputMode;
+	SetInputMode(InputMode);
+
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	UIManagerComponent->OnCreateRoomRequested.AddDynamic(this, &ASITitlePlayerController::OnCreateRoomClicked);
+
+	TObjectPtr<USIMainMenuWidget> MainMenuWidget = CreateWidget<USIMainMenuWidget>(this, MainMenuWidgetClass);
+
+	if (!IsValid(MainMenuWidget))
+	{
+		return;
+	}
+
+	MainMenuWidget->OnClickedCreateRoomButton.AddDynamic(this, &ASITitlePlayerController::HandleCreateRoom);
+	MainMenuWidget->OnClickedJoinRoomButton.AddDynamic(this, &ASITitlePlayerController::HandleJoinRoom);
+	MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASITitlePlayerController::HandleQuit);
+
+	MainMenuWidget->AddToViewport();
+}
+
+void ASITitlePlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+
+	if (!EnhancedInputComponent)
+	{
+		return;
+	}
+
+	EnhancedInputComponent->BindAction(IA_UICancel, ETriggerEvent::Started, this, &ASITitlePlayerController::HandleCancel);
+}
+
+void ASITitlePlayerController::HandleCancel()
+{
+	UIManagerComponent->CloseWidget();
+}
+
+void ASITitlePlayerController::HandleCreateRoom()
+{
+	UIManagerComponent->OpenWidget(EUIType::CreateRoom);
+}
+
+void ASITitlePlayerController::HandleJoinRoom()
+{
+	UIManagerComponent->OpenWidget(EUIType::RoomList);
+}
+
+void ASITitlePlayerController::HandleQuit()
+{
+	UIManagerComponent->OpenWidget(EUIType::Exit);
+}
+
+void ASITitlePlayerController::OnCreateRoomClicked()
+{
+	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
+	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));
+}
