@@ -106,6 +106,7 @@ void APlacedShapeActor::SetBeingEdited(bool bInIsBeingEdited)
 void APlacedShapeActor::SetHovered(bool bHovered)
 {
 	MeshComponent->SetRenderCustomDepth(bHovered);
+	MeshComponent->SetCustomDepthStencilValue(bHovered ? 1 : 0);
 }
 
 // 복제된 시각 정보가 변경되면 실제 컴포넌트에 반영한다.
