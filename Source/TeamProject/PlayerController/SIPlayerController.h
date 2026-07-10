@@ -7,10 +7,11 @@
 #include "Component/SIUIManagerComponent.h"
 #include "SIPlayerController.generated.h"
 
+class USIUIManagerComponent;
 
 class USIDrawingToolWidget;
-class USIUIManagerComponent;
 class USIMainMenuWidget;
+class USILobbySettingWidget;
 
 class UInputAction;
 
@@ -101,35 +102,39 @@ private:
 
 	//========== LobbySettingWidget ==========
 private:
-	TSubclassOf<USIUserWidget> LobbySettingWidgetClass;
+	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USILobbySettingWidget> LobbySettingWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<USILobbySettingWidget> LobbySettingWidget;
 
 private:
 	UFUNCTION()
-	void OnCreateRoomClicked();
+	void HandleCreateRoomConfirmed();
 
 	//========== Remove UI ==========
 	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> IA_UICancel;
 
-private:
-	void HandleCancel();
 
-	//========== UI VAR & FUNCS ==========
+	//========== UI Comp & FUNCS ==========
 private:
 	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
 
 private:
-	UFUNCTION()
-	void HandleUIConfirmed(EUIType type);
+	void OpenWidget(TObjectPtr<UUserWidget> Widget, TSubclassOf<UUserWidget> WidgetClass);
 
+	void CloseWidget(TObjectPtr<UUserWidget> Widget);
 
 private:
 	virtual void ReceivedPlayer() override;
 
 	virtual void SetupInputComponent() override;
 
+	void HandleUIConfirmed(EUIType type);
 
+	void HandleCancel();
 #pragma endregion
 	
 

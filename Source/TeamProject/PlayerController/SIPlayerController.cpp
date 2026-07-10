@@ -7,6 +7,7 @@
 #include "GameState/SIGameState.h"        
 #include "UI/SIDrawingToolWidget.h" 
 #include "UI/SIMainMenuWidget.h"
+#include "UI/SILobbySettingWidget.h"
 
 #include "EnhancedInputComponent.h"
 #include "GameInstance/SIGameInstance.h"
@@ -126,21 +127,44 @@ void ASIPlayerController::HandleQuit()
 	UIManagerComponent->OpenWidget(EUIType::Exit);
 }
 
-void ASIPlayerController::OnCreateRoomClicked()
+void ASIPlayerController::HandleCreateRoomConfirmed()
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
-	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));
+
+	OpenWidget(LobbySettingWidget, LobbySettingWidgetClass);
+}
+
+
+void ASIPlayerController::OpenWidget(TObjectPtr<UUserWidget> Widget, TSubclassOf<UUserWidget> WidgetClass)
+{
+	if (!IsValid(Widget) || !WidgetClass)
+	{
+		return;
+	}
+
+	Widget = CreateWidget<UUserWidget>(this, WidgetClass);
+
+	Widget->AddToViewport();
+}
+
+void ASIPlayerController::CloseWidget(TObjectPtr<UUserWidget> Widget)
+{
+	if (!IsValid(Widget))
+	{
+		return;
+	}
+
+	Widget->RemoveFromParent();
+}
+
+void ASIPlayerController::HandleUIConfirmed(EUIType type)
+{
+	UIManagerComponent->OpenWidget(type);
 }
 
 void ASIPlayerController::HandleCancel()
 {
 	UIManagerComponent->CloseWidget();
-}
-
-void ASIPlayerController::HandleUIConfirmed(EUIType type)
-{
-	UE_LOG(LogTemp, Warning, TEXT("[PC] UI Confirmed: %d"), (int32)type);
-	//UIManagerComponent->OpenWidget(type);
 }
 
 void ASIPlayerController::ReceivedPlayer()
