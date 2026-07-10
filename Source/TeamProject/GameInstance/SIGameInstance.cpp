@@ -9,7 +9,7 @@ void USIGameInstance::CreateRoom()
 {
 	UGameplayStatics::OpenLevel(
 		this,
-		FName("/Game/Maps/LobbyLevel"),
+		FName("/Game/Shape_It/Level/Test_Lobby"),
 		true,
 		TEXT("listen")
 	);
