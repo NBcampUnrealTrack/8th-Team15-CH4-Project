@@ -34,7 +34,6 @@ private:
 	UFUNCTION()
 	void HandleCreateClicked();
 
-
 private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UCheckBox> CheckBox_Public;

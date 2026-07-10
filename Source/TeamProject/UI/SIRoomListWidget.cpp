@@ -28,4 +28,5 @@ void USIRoomListWidget::HandleBackClicked()
 void USIRoomListWidget::HandleCreateClicked()
 {
 	HandleConfirmed();
+	
 }

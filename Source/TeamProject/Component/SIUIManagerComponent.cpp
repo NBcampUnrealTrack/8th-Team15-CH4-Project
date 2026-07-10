@@ -44,6 +44,7 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 
 	if (!FoundClass || !*FoundClass)
 	{
+		UE_LOG(LogTemp, Error, TEXT("[UIMgr] WidgetClasses에 Type=%d 없음"), (int32)Type);
 		return;
 	}
 
@@ -67,6 +68,8 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 	NewWidget->AddToViewport();
 	NewWidget->OnConfirmed.AddDynamic(this, &USIUIManagerComponent::OnWidgetConfirmed);
 	NewWidget->OnCancelled.AddDynamic(this, &USIUIManagerComponent::OnWidgetCancelled);
+
+	NewWidget->OnConfirmed.AddDynamic(this, &USIUIManagerComponent::HandleCreateRoomRequested);
 
 	FUIStackEntry UIStackEntry;
 
@@ -101,5 +104,11 @@ void USIUIManagerComponent::CloseWidget()
 void USIUIManagerComponent::OnWidgetCancelled()
 {
 	CloseWidget();
+}
+
+void USIUIManagerComponent::HandleCreateRoomRequested()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[PC] HandleCreateRoom 호출됨"));
+	OnCreateRoomRequested.Broadcast();
 }
 

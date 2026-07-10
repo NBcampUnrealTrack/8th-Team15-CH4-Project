@@ -49,4 +49,5 @@ private:
 
 	UFUNCTION()
 	void HandleQuitClicked();
+
 };

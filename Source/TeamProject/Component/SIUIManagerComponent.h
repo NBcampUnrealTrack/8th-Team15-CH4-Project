@@ -32,6 +32,7 @@ public:
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUIConfirmed, EUIType, type);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCreateRoomRequested);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TEAMPROJECT_API USIUIManagerComponent : public UActorComponent
@@ -51,12 +52,19 @@ public:
 	UPROPERTY()
 	FOnUIConfirmed OnUIConfirmed;
 
+	UPROPERTY()
+	FOnCreateRoomRequested OnCreateRoomRequested;
+
 private:
 	UFUNCTION()
 	void OnWidgetConfirmed();
 
 	UFUNCTION()
 	void OnWidgetCancelled();
+
+	UFUNCTION()
+	void HandleCreateRoomRequested();
+
 private:
 	UPROPERTY(EditAnywhere, Category = "UI", meta = (AllowPrivateAccess = "true"))
 	TMap<EUIType, TSubclassOf<USIUserWidget>> WidgetClasses;

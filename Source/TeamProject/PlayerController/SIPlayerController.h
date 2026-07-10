@@ -70,6 +70,7 @@ public:
 #pragma endregion 
 
 #pragma region UI
+
 	//========== DrawingTool UI Test ==========
 protected:
 	// 액터 변형 관련 UI Widget Class
@@ -101,6 +102,10 @@ private:
 	//========== LobbySettingWidget ==========
 private:
 	TSubclassOf<USIUserWidget> LobbySettingWidgetClass;
+
+private:
+	UFUNCTION()
+	void OnCreateRoomClicked();
 
 	//========== Remove UI ==========
 	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))

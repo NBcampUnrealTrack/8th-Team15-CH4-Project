@@ -38,4 +38,3 @@ void USIMainMenuWidget::HandleQuitClicked()
 {
 	OnClickedQuitButton.Broadcast();
 }
-
