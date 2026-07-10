@@ -131,30 +131,29 @@ void ASIPlayerController::HandleCreateRoomConfirmed()
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
 
-	OpenWidget(LobbySettingWidget, LobbySettingWidgetClass);
+	OpenLobbySettingWidget();
 }
 
-
-void ASIPlayerController::OpenWidget(TObjectPtr<UUserWidget> Widget, TSubclassOf<UUserWidget> WidgetClass)
+void ASIPlayerController::OpenLobbySettingWidget()
 {
-	if (!IsValid(Widget) || !WidgetClass)
+	if (!LobbySettingWidgetClass)
 	{
 		return;
 	}
 
-	Widget = CreateWidget<UUserWidget>(this, WidgetClass);
+	LobbySettingWidget = CreateWidget<USILobbySettingWidget>(this, LobbySettingWidgetClass);
 
-	Widget->AddToViewport();
+	LobbySettingWidget->AddToViewport();
 }
 
-void ASIPlayerController::CloseWidget(TObjectPtr<UUserWidget> Widget)
+void ASIPlayerController::CloseLobbySettingWidget()
 {
-	if (!IsValid(Widget))
+	if (!IsValid(LobbySettingWidget))
 	{
 		return;
 	}
 
-	Widget->RemoveFromParent();
+	LobbySettingWidget->RemoveFromParent();
 }
 
 void ASIPlayerController::HandleUIConfirmed(EUIType type)

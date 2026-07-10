@@ -69,7 +69,10 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 	NewWidget->OnConfirmed.AddDynamic(this, &USIUIManagerComponent::OnWidgetConfirmed);
 	NewWidget->OnCancelled.AddDynamic(this, &USIUIManagerComponent::OnWidgetCancelled);
 
-	NewWidget->OnConfirmed.AddDynamic(this, &USIUIManagerComponent::HandleCreateRoomRequested);
+	if (Type == EUIType::CreateRoom)
+	{
+		NewWidget->OnConfirmed.AddDynamic(this, &USIUIManagerComponent::HandleCreateRoomRequested);
+	}
 
 	FUIStackEntry UIStackEntry;
 
@@ -95,6 +98,11 @@ void USIUIManagerComponent::CloseWidget()
 
 	TargetWidget->OnConfirmed.RemoveDynamic(this, &USIUIManagerComponent::OnWidgetConfirmed);
 	TargetWidget->OnCancelled.RemoveDynamic(this, &USIUIManagerComponent::OnWidgetCancelled);
+
+	if (WidgetStack.Last().UIType == EUIType::CreateRoom)
+	{
+		TargetWidget->OnConfirmed.RemoveDynamic(this, &USIUIManagerComponent::HandleCreateRoomRequested);
+	}
 
 	TargetWidget->RemoveFromParent();
 

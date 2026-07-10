@@ -112,6 +112,10 @@ private:
 	UFUNCTION()
 	void HandleCreateRoomConfirmed();
 
+	void OpenLobbySettingWidget();
+
+	void CloseLobbySettingWidget();
+
 	//========== Remove UI ==========
 	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> IA_UICancel;
@@ -122,10 +126,6 @@ private:
 	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
 
-private:
-	void OpenWidget(TObjectPtr<UUserWidget> Widget, TSubclassOf<UUserWidget> WidgetClass);
-
-	void CloseWidget(TObjectPtr<UUserWidget> Widget);
 
 private:
 	virtual void ReceivedPlayer() override;
