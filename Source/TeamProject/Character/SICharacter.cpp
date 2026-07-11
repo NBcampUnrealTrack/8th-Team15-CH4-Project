@@ -380,13 +380,32 @@ void ASICharacter::ToggleUIOnlyMode()
 		
 		// 3. 마지막에 커서를 노출 (이미 중앙으로 옮겨진 상태에서 등장)
 		PlayerController->bShowMouseCursor = true;
+
+		if (ObjectEditState == EObjectEditState::Rebase)
+		{
+			// 재배치 중에는 UI 모드에서만 Rotate/Scale 기즈모를 표시한다.
+			StartPreviewGizmo(false);
+		}
 	}
 	else
 	{
-		// 게임 전용 모드로 복구
-		FInputModeGameOnly InputMode;
-		PlayerController->SetInputMode(InputMode);
-		PlayerController->bShowMouseCursor = false;
+		if (ObjectEditState == EObjectEditState::Rebase && PreviewTransformGizmoComponent)
+		{
+			PreviewTransformGizmoComponent->StopEditing();
+		}
+
+		if (PreviewActor && ObjectEditState != EObjectEditState::Rebase)
+		{
+			// 오브젝트 편집 중이면 UI 종료 후에도 기즈모 입력 상태를 유지한다.
+			SetObjectGizmoInputMode(true);
+		}
+		else
+		{
+			// 게임 전용 모드로 복구
+			FInputModeGameOnly InputMode;
+			PlayerController->SetInputMode(InputMode);
+			PlayerController->bShowMouseCursor = false;
+		}
 	}
 	
 	// 모드 전환 시 박혀있던 키 입력들 초기화
@@ -566,6 +585,8 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 		ObjectEditState = EObjectEditState::Preview;
 		UpdatePreviewTransform();
 		StartPreviewGizmo(false);
+		bIsUIOnlyMode = false;
+		SetObjectGizmoInputMode(true);
 		// SyncDetailPanelToPreview();
 	}
 }
@@ -779,6 +800,7 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 		ObjectEditState = EObjectEditState::Selected;
 		StartPreviewGizmo(true);
 		BeginSelectedCameraFocus();
+		SetObjectGizmoInputMode(true);
 		// SyncDetailPanelToPreview();
 	}
 }
@@ -790,6 +812,15 @@ void ASICharacter::ClearPreview()
 	{
 		PreviewTransformGizmoComponent->StopEditing();
 	}
+	if (bIsGizmoDragging)
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			PlayerController->SetIgnoreLookInput(false);
+		}
+		bIsGizmoDragging = false;
+	}
+	SetObjectGizmoInputMode(false);
 	EndSelectedCameraFocus();
 
 	if (PreviewActor)
@@ -882,13 +913,19 @@ void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
 // 서버에서 실제 배치 도형을 생성한다.
 void ASICharacter::HandlePrimaryActionStarted()
 {
-	// UI 모드에서는 기즈모 클릭만 처리한다.
+	// 프리뷰와 선택 상태에서는 기즈모가 마우스 입력을 먼저 처리한다.
+	if (PreviewTransformGizmoComponent && PreviewTransformGizmoComponent->TryBeginMouseInteraction())
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			PlayerController->SetIgnoreLookInput(true);
+			bIsGizmoDragging = true;
+		}
+		return;
+	}
+
 	if (bIsUIOnlyMode)
 	{
-		if (PreviewTransformGizmoComponent)
-		{
-			PreviewTransformGizmoComponent->TryBeginMouseInteraction();
-		}
 		return;
 	}
 
@@ -901,11 +938,19 @@ void ASICharacter::HandlePrimaryActionCompleted()
 	{
 		PreviewTransformGizmoComponent->EndMouseInteraction();
 	}
+	if (bIsGizmoDragging)
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			PlayerController->SetIgnoreLookInput(false);
+		}
+		bIsGizmoDragging = false;
+	}
 }
 
 void ASICharacter::ToggleRebaseMode()
 {
-	if (bIsUIOnlyMode || !PreviewActor || !bIsEditingExistingShape)
+	if (!PreviewActor || !bIsEditingExistingShape)
 	{
 		return;
 	}
@@ -915,7 +960,12 @@ void ASICharacter::ToggleRebaseMode()
 		// 재배치에서는 카메라 고정을 풀고 기존 배치 추적을 사용한다.
 		EndSelectedCameraFocus();
 		ObjectEditState = EObjectEditState::Rebase;
-		StartPreviewGizmo(false);
+		if (PreviewTransformGizmoComponent)
+		{
+			PreviewTransformGizmoComponent->StopEditing();
+		}
+		bIsUIOnlyMode = false;
+		SetObjectGizmoInputMode(false);
 		UpdatePreviewTransform();
 	}
 	else if (ObjectEditState == EObjectEditState::Rebase)
@@ -930,6 +980,33 @@ void ASICharacter::StartPreviewGizmo(bool bEnableLocation)
 	{
 		PreviewTransformGizmoComponent->StartEditing(PreviewActor, bEnableLocation);
 	}
+}
+
+void ASICharacter::SetObjectGizmoInputMode(bool bEnable)
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController || !PlayerController->IsLocalController())
+	{
+		return;
+	}
+
+	if (bEnable)
+	{
+		// 커서를 유지하면서 게임 입력과 기즈모 입력을 함께 받는다.
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+		InputMode.SetHideCursorDuringCapture(false);
+		PlayerController->SetInputMode(InputMode);
+		PlayerController->bShowMouseCursor = true;
+	}
+	else if (!bIsUIOnlyMode)
+	{
+		FInputModeGameOnly InputMode;
+		PlayerController->SetInputMode(InputMode);
+		PlayerController->bShowMouseCursor = false;
+	}
+
+	PlayerController->FlushPressedKeys();
 }
 
 void ASICharacter::HandlePreviewGizmoTransformChanged(const FTransform& NewTransform)

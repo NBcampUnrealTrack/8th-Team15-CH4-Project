@@ -10,6 +10,7 @@
 #include "UI/SILobbySettingWidget.h"
 
 #include "EnhancedInputComponent.h"
+#include "Engine/GameViewportClient.h"
 #include "GameInstance/SIGameInstance.h"
 
 ASIPlayerController::ASIPlayerController()
@@ -182,6 +183,20 @@ void ASIPlayerController::ReceivedPlayer()
 	{
 		// 뷰포트에 노출
 		DrawingToolWidgetInstance->AddToViewport();
+	}
+
+	if (IsLocalController())
+	{
+		// 게임 시작 즉시 뷰포트가 마우스를 잡도록 초기 입력 상태를 설정한다.
+		bShowMouseCursor = false;
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+
+		if (UGameViewportClient* GameViewportClient = GetWorld()->GetGameViewport())
+		{
+			GameViewportClient->SetMouseCaptureMode(EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown);
+			GameViewportClient->SetMouseLockMode(EMouseLockMode::LockAlways);
+		}
 	}
 	
 	// // 메인메뉴 띄우고 바인딩하는 코드. 결과물 합치고 난 이후에 주석 해제하기.

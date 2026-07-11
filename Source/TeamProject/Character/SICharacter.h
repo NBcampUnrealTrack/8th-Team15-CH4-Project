@@ -188,6 +188,7 @@ private:
 	FRotator ControlRotationBeforeSelection = FRotator::ZeroRotator;
 	bool bHasSavedSelectionControlRotation = false;
 	bool bApplyingGizmoTransform = false;
+	bool bIsGizmoDragging = false;
 	
 public:
 	UFUNCTION(BlueprintCallable, Category = "Placement")
@@ -206,6 +207,7 @@ private:
 	void HandlePrimaryActionCompleted();
 	void ToggleRebaseMode();
 	void StartPreviewGizmo(bool bEnableLocation);
+	void SetObjectGizmoInputMode(bool bEnable);
 	void HandlePreviewGizmoTransformChanged(const FTransform& NewTransform);
 	void UpdateSelectedCameraFocus();
 	void BeginSelectedCameraFocus();
