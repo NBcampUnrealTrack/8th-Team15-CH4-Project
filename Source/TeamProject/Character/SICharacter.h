@@ -9,6 +9,7 @@
 class APlacedShapeActor;
 class APlacementPreviewActor;
 class USIDrawingToolWidget;
+class USIPreviewTransformGizmoComponent;
 class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
 class UStaticMeshComponent;
@@ -129,6 +130,14 @@ private:
 #pragma endregion 
 	
 #pragma region Object
+	// 오브젝트 편집 상태는 UI 모드와 별도로 유지한다.
+	enum class EObjectEditState : uint8
+	{
+		None,
+		Preview,
+		Selected,
+		Rebase
+	};
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
@@ -145,6 +154,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<APlacedShapeActor> HoveredShape;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
+	TObjectPtr<USIPreviewTransformGizmoComponent> PreviewTransformGizmoComponent;
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
@@ -172,25 +184,39 @@ private:
 	bool bIsEditingExistingShape;
 	FName EditingOriginalShapeId;
 	FTransform EditingOriginalTransform;
+	EObjectEditState ObjectEditState = EObjectEditState::None;
+	FRotator ControlRotationBeforeSelection = FRotator::ZeroRotator;
+	bool bHasSavedSelectionControlRotation = false;
+	bool bApplyingGizmoTransform = false;
 	
 public:
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartShapePreview(FName ShapeId);
 	
 private:
-	void BindDetailPanelDelegates();
-	void SyncDetailPanelToPreview();
+	// Detail Panel Transform 편집은 기즈모로 이전되어 임시 비활성화한다.
+	// void BindDetailPanelDelegates();
+	// void SyncDetailPanelToPreview();
 	void UpdatePreviewTransform();
 	void UpdateHoveredShape();
 	void SetHoveredShape(APlacedShapeActor* NewHoveredShape);
 	void StartEditPreview(FName ShapeId, const FTransform& PreviewTransform);
 	void ClearPreview();
+	void HandlePrimaryActionStarted();
+	void HandlePrimaryActionCompleted();
+	void ToggleRebaseMode();
+	void StartPreviewGizmo(bool bEnableLocation);
+	void HandlePreviewGizmoTransformChanged(const FTransform& NewTransform);
+	void UpdateSelectedCameraFocus();
+	void BeginSelectedCameraFocus();
+	void EndSelectedCameraFocus();
+	bool IsSelectionCameraLocked() const;
 
-	UFUNCTION()
-	void HandlePreviewRotationChanged(EAxis::Type Axis, float Value);
+	// UFUNCTION()
+	// void HandlePreviewRotationChanged(EAxis::Type Axis, float Value);
 
-	UFUNCTION()
-	void HandlePreviewScaleChanged(EAxis::Type Axis, float Value);
+	// UFUNCTION()
+	// void HandlePreviewScaleChanged(EAxis::Type Axis, float Value);
 	
 	UFUNCTION(Server, Reliable)
 	void Server_RequestSpawnShape(FName ShapeId, FTransform SpawnTransform);

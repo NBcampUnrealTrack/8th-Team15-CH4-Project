@@ -17,7 +17,9 @@ public class TeamProject : ModuleRules
             "UMG"
         });
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+            "InteractiveToolsFramework"
+        });
 
         PublicIncludePaths.AddRange(new string[] { "TeamProject" });
         // Uncomment if you are using Slate UI

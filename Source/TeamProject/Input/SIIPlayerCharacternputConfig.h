@@ -47,5 +47,8 @@ public:
 	TObjectPtr<UInputAction> ResetPreviewTransform;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> RebaseMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UInputAction> Participants;
 };

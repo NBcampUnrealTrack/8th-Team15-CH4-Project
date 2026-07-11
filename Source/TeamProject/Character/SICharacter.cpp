@@ -16,6 +16,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Input/SIIPlayerCharacternputConfig.h"
 #include "Object/PlacedShapeActor.h"
+#include "Object/Component/SIPreviewTransformGizmoComponent.h"
 #include "Object/PlacementPreviewActor.h"
 #include "Object/ShapeDefinitionRow.h"
 #include "PlayerController/SIPlayerController.h"
@@ -25,6 +26,10 @@
 
 namespace
 {
+	constexpr float MinGizmoPreviewScale = 0.65f;
+	constexpr float MaxGizmoPreviewScale = 1.35f;
+
+	/* Detail Panel의 Rotation/Scale 편집은 기즈모로 이전되어 임시 비활성화한다.
 	constexpr float PreviewRotationRangeDegrees = 180.0f;
 	constexpr float PreviewSliderMinValue = 0.0f;
 	constexpr float PreviewSliderMaxValue = 2.0f;
@@ -42,6 +47,7 @@ namespace
 	{
 		return FMath::GetMappedRangeValueClamped(FVector2D(PreviewSliderMinValue, PreviewSliderMaxValue), FVector2D(MinPreviewScale, MaxPreviewScale), Value);
 	}
+	*/
 }
 
 #pragma region ACharacter Override
@@ -60,6 +66,9 @@ ASICharacter::ASICharacter()
 	ArmOnlyComp->SetupAttachment(CameraComp);
 	ArmOnlyComp->SetOnlyOwnerSee(true);
 	ArmOnlyComp->bCastDynamicShadow = false;
+
+	// 오브젝트 프리뷰 기즈모는 Character가 연결만 담당한다.
+	PreviewTransformGizmoComponent = CreateDefaultSubobject<USIPreviewTransformGizmoComponent>(TEXT("PreviewTransformGizmoComponent"));
 	
 	// ??? 까먹음 추후 수정함
 	GetMesh()->SetOwnerNoSee(true);
@@ -110,7 +119,11 @@ void ASICharacter::BeginPlay()
 	// 초기 가시성 설정
 	UpdateMeshVisibility();
 	
-	BindDetailPanelDelegates();
+	// BindDetailPanelDelegates();
+	if (PreviewTransformGizmoComponent)
+	{
+		PreviewTransformGizmoComponent->OnTransformChanged.AddUObject(this, &ASICharacter::HandlePreviewGizmoTransformChanged);
+	}
 }
 
 void ASICharacter::PossessedBy(AController* NewController)
@@ -136,6 +149,7 @@ void ASICharacter::Tick(float DeltaTime)
 
 	UpdatePreviewTransform();
 	UpdateHoveredShape();
+	UpdateSelectedCameraFocus();
 }
 
 // Called to bind functionality to input
@@ -157,11 +171,16 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		// EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Preview, ETriggerEvent::Started, this, &ThisClass::StartBoxPreview);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->IncreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::IncreasePreviewDistance);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->DecreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::DecreasePreviewDistance);
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Started, this, &ThisClass::ConfirmPlacement);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Started, this, &ThisClass::HandlePrimaryActionStarted);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Completed, this, &ThisClass::HandlePrimaryActionCompleted);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Cancel, ETriggerEvent::Started, this, &ThisClass::CancelPreview);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ResetPreviewTransform, ETriggerEvent::Started, this, &ThisClass::ResetPreviewTransform);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Participants, ETriggerEvent::Started, this, &ThisClass::OpenParticipants);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Participants, ETriggerEvent::Completed, this, &ThisClass::CloseParticipants);
+		if (PlayerCharacterInputConfig->RebaseMode)
+		{
+			EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->RebaseMode, ETriggerEvent::Started, this, &ThisClass::ToggleRebaseMode);
+		}
 	}
 }
 
@@ -264,7 +283,7 @@ void ASICharacter::Move(const FInputActionValue& InValue)
 void ASICharacter::Look(const FInputActionValue& InValue)
 {
 	// UI 조작 중이라면 입력을 무시합니다.
-	if (bIsUIOnlyMode)
+	if (bIsUIOnlyMode || IsSelectionCameraLocked())
 	{
 		return;
 	}
@@ -345,7 +364,7 @@ void ASICharacter::ToggleUIOnlyMode()
 	if (bIsUIOnlyMode)
 	{
 		GetCharacterMovement()->StopMovementImmediately();
-		BindDetailPanelDelegates();
+		// BindDetailPanelDelegates();
  
 		// 1. 마우스 위치를 먼저 중앙으로 '예약' 세팅
 		int32 ViewportSizeX, ViewportSizeY;
@@ -436,15 +455,7 @@ void ASICharacter::ConfirmPlacement()
 	{
 		// 설치는 서버에서 확정
 		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform());
-		if (bIsEditingExistingShape)
-		{
-			ClearPreview();
-			return;
-		}
-
-		bIsEditingExistingShape = false;
-		EditingOriginalShapeId = NAME_None;
-		EditingOriginalTransform = FTransform::Identity;
+		ClearPreview();
 		return;
 	}
 
@@ -509,7 +520,7 @@ void ASICharacter::ResetPreviewTransform()
 	}
 
 	UpdatePreviewTransform();
-	SyncDetailPanelToPreview();
+	// SyncDetailPanelToPreview();
 }
 
 void ASICharacter::ServerRPCSetMovementMode_Implementation(EMovementMode NewMovementMode)
@@ -552,12 +563,15 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 		bIsEditingExistingShape = false;
 		EditingOriginalShapeId = NAME_None;
 		EditingOriginalTransform = FTransform::Identity;
+		ObjectEditState = EObjectEditState::Preview;
 		UpdatePreviewTransform();
-		SyncDetailPanelToPreview();
+		StartPreviewGizmo(false);
+		// SyncDetailPanelToPreview();
 	}
 }
 
 // 디테일 패널 UI의 회전/스케일 변경 이벤트를 프리뷰 조작 함수에 연결한다.
+/* Detail Panel 관련 연결은 기즈모 편집으로 이전되어 임시 비활성화한다.
 void ASICharacter::BindDetailPanelDelegates()
 {
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
@@ -604,11 +618,18 @@ void ASICharacter::SyncDetailPanelToPreview()
 	DetailPanel->SetRotationValues(PreviewRotation);
 	DetailPanel->SetScaleValues(PreviewScale);
 }
+*/
 
 // 플레이어 시선 기준으로 프리뷰 위치와 변형을 갱신한다.
 void ASICharacter::UpdatePreviewTransform()
 {
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	// 선택 상태에서는 도형 위치를 고정한다.
+	if (ObjectEditState == EObjectEditState::Selected)
 	{
 		return;
 	}
@@ -640,6 +661,11 @@ void ASICharacter::UpdatePreviewTransform()
 		PreviewActor->SetActorLocation(TraceEnd);
 		PreviewActor->SetActorRotation(PreviewRotation);
 		PreviewActor->SetActorScale3D(PreviewScale);
+	}
+
+	if (PreviewTransformGizmoComponent)
+	{
+		PreviewTransformGizmoComponent->SynchronizeTargetTransform();
 	}
 }
 
@@ -750,13 +776,22 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 		PreviewActor->SetActorTransform(PreviewTransform);
 		PreviewRotation = PreviewActor->GetActorRotation();
 		PreviewScale = PreviewActor->GetActorScale3D();
-		SyncDetailPanelToPreview();
+		ObjectEditState = EObjectEditState::Selected;
+		StartPreviewGizmo(true);
+		BeginSelectedCameraFocus();
+		// SyncDetailPanelToPreview();
 	}
 }
 
 // 현재 프리뷰를 제거하고 관련 상태와 UI를 초기화한다.
 void ASICharacter::ClearPreview()
 {
+	if (PreviewTransformGizmoComponent)
+	{
+		PreviewTransformGizmoComponent->StopEditing();
+	}
+	EndSelectedCameraFocus();
+
 	if (PreviewActor)
 	{
 		PreviewActor->Destroy();
@@ -769,7 +804,9 @@ void ASICharacter::ClearPreview()
 	bIsEditingExistingShape = false;
 	EditingOriginalShapeId = NAME_None;
 	EditingOriginalTransform = FTransform::Identity;
+	ObjectEditState = EObjectEditState::None;
 
+	/* Detail Panel 관련 코드는 기즈모 편집으로 이전되어 임시 비활성화한다.
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
 	if (!PlayerController)
 	{
@@ -781,9 +818,11 @@ void ASICharacter::ClearPreview()
 	{
 		DetailPanel->SetTransformControlsEnabled(false);
 	}
+	*/
 }
 
 // 디테일 패널에서 변경된 회전 값을 프리뷰에 적용한다.
+/* Detail Panel 관련 코드는 기즈모 편집으로 이전되어 임시 비활성화한다.
 void ASICharacter::HandlePreviewRotationChanged(EAxis::Type Axis, float Value)
 {
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
@@ -838,8 +877,142 @@ void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
 
 	UpdatePreviewTransform();
 }
+*/
 
 // 서버에서 실제 배치 도형을 생성한다.
+void ASICharacter::HandlePrimaryActionStarted()
+{
+	// UI 모드에서는 기즈모 클릭만 처리한다.
+	if (bIsUIOnlyMode)
+	{
+		if (PreviewTransformGizmoComponent)
+		{
+			PreviewTransformGizmoComponent->TryBeginMouseInteraction();
+		}
+		return;
+	}
+
+	ConfirmPlacement();
+}
+
+void ASICharacter::HandlePrimaryActionCompleted()
+{
+	if (PreviewTransformGizmoComponent)
+	{
+		PreviewTransformGizmoComponent->EndMouseInteraction();
+	}
+}
+
+void ASICharacter::ToggleRebaseMode()
+{
+	if (bIsUIOnlyMode || !PreviewActor || !bIsEditingExistingShape)
+	{
+		return;
+	}
+
+	if (ObjectEditState == EObjectEditState::Selected)
+	{
+		// 재배치에서는 카메라 고정을 풀고 기존 배치 추적을 사용한다.
+		EndSelectedCameraFocus();
+		ObjectEditState = EObjectEditState::Rebase;
+		StartPreviewGizmo(false);
+		UpdatePreviewTransform();
+	}
+	else if (ObjectEditState == EObjectEditState::Rebase)
+	{
+		ConfirmPlacement();
+	}
+}
+
+void ASICharacter::StartPreviewGizmo(bool bEnableLocation)
+{
+	if (PreviewTransformGizmoComponent && PreviewActor)
+	{
+		PreviewTransformGizmoComponent->StartEditing(PreviewActor, bEnableLocation);
+	}
+}
+
+void ASICharacter::HandlePreviewGizmoTransformChanged(const FTransform& NewTransform)
+{
+	if (!PreviewActor || bApplyingGizmoTransform)
+	{
+		return;
+	}
+
+	bApplyingGizmoTransform = true;
+	FTransform AppliedTransform = NewTransform;
+	FVector SafeScale = NewTransform.GetScale3D();
+	SafeScale.X = FMath::Clamp(SafeScale.X, MinGizmoPreviewScale, MaxGizmoPreviewScale);
+	SafeScale.Y = FMath::Clamp(SafeScale.Y, MinGizmoPreviewScale, MaxGizmoPreviewScale);
+	SafeScale.Z = FMath::Clamp(SafeScale.Z, MinGizmoPreviewScale, MaxGizmoPreviewScale);
+	AppliedTransform.SetScale3D(SafeScale);
+
+	PreviewRotation = AppliedTransform.GetRotation().Rotator();
+	PreviewScale = SafeScale;
+
+	if (ObjectEditState == EObjectEditState::Selected)
+	{
+		// Location 변경은 선택 상태에서만 허용한다.
+		PreviewActor->SetActorTransform(AppliedTransform);
+	}
+	else
+	{
+		UpdatePreviewTransform();
+	}
+
+	bApplyingGizmoTransform = false;
+}
+
+void ASICharacter::BeginSelectedCameraFocus()
+{
+	AController* PlayerController = GetController();
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	ControlRotationBeforeSelection = PlayerController->GetControlRotation();
+	bHasSavedSelectionControlRotation = true;
+	UpdateSelectedCameraFocus();
+}
+
+void ASICharacter::UpdateSelectedCameraFocus()
+{
+	if (!IsSelectionCameraLocked() || !PreviewActor || !CameraComp || !GetController())
+	{
+		return;
+	}
+
+	// 카메라는 선택 도형의 실제 bounds 중심을 계속 바라본다.
+	FVector ShapeCenter;
+	FVector ShapeExtent;
+	PreviewActor->GetActorBounds(false, ShapeCenter, ShapeExtent);
+	const FVector LookDirection = ShapeCenter - CameraComp->GetComponentLocation();
+	if (!LookDirection.IsNearlyZero())
+	{
+		GetController()->SetControlRotation(LookDirection.Rotation());
+	}
+
+	if (PreviewTransformGizmoComponent)
+	{
+		PreviewTransformGizmoComponent->SynchronizeTargetTransform();
+	}
+}
+
+void ASICharacter::EndSelectedCameraFocus()
+{
+	if (bHasSavedSelectionControlRotation && GetController())
+	{
+		GetController()->SetControlRotation(ControlRotationBeforeSelection);
+	}
+	bHasSavedSelectionControlRotation = false;
+}
+
+bool ASICharacter::IsSelectionCameraLocked() const
+{
+	return ObjectEditState == EObjectEditState::Selected;
+}
+
 void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform)
 {
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
