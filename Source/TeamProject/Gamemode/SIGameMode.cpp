@@ -1,6 +1,7 @@
 #include "SIGameMode.h"
 #include "GameState/SIGameState.h"
-#include "PlayerController/SIPlayerController.h" 
+#include "PlayerController/SIPlayerController.h"
+#include "PlayerState/SIPlayerState.h"
 #include "GameFramework/PlayerState.h"
 #include "TimerManager.h"
 
@@ -95,17 +96,17 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 	// 정답 판별 (대소문자 무시)
 	if (SubmittedAnswer.Equals(CurrentCorrectAnswer, ESearchCase::IgnoreCase))
 	{
-		APlayerState* SubmitterState = Submitter->PlayerState;
+		ASIPlayerState* SubmitterState = Submitter->GetPlayerState<ASIPlayerState>();
 		if (SubmitterState)
 		{
-			// 선착순 점수 차등 지급
+			// 선착순 점수 차등 지급 (AddScore 사용해야 OnScoreUpdated 델리게이트가 발동됨)
 			int32 ScoreToEarn = FMath::Max(5 - CorrectCountThisTurn, 1);
-			SubmitterState->SetScore(SubmitterState->GetScore() + ScoreToEarn);
+			SubmitterState->AddScore(ScoreToEarn);
 
 			// 방 주인에게도 1점 보너스 지급
-			if (SIGameState->CurrentPresenter)
+			if (ASIPlayerState* PresenterState = Cast<ASIPlayerState>(SIGameState->CurrentPresenter))
 			{
-				SIGameState->CurrentPresenter->SetScore(SIGameState->CurrentPresenter->GetScore() + 1);
+				PresenterState->AddScore(1);
 			}
 
 			CorrectCountThisTurn++;
