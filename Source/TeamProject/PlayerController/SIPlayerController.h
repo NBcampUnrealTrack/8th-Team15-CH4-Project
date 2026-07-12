@@ -12,6 +12,7 @@ class USIUIManagerComponent;
 class USIDrawingToolWidget;
 class USIMainMenuWidget;
 class USILobbySettingWidget;
+class USIHUDWidget;
 
 class UInputAction;
 
@@ -107,6 +108,27 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USILobbySettingWidget> LobbySettingWidget;
+
+	//========== HUDWidget ==========
+private:
+	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"), Category = "UI")
+	TSubclassOf<USIHUDWidget> HUDWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<USIHUDWidget> HUDWidget;
+
+	// Client_ReceiveSecretWord가 HUD 생성 전에 도착한 경우를 위한 캐시
+	FString PendingSecretWord;
+
+public:
+	USIHUDWidget* GetHUDWidget() const { return HUDWidget; }
+
+	// 인게임 진입 시 호출해 HUD 생성 및 뷰포트 부착
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ShowHUDWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void HideHUDWidget();
 
 private:
 	UFUNCTION()

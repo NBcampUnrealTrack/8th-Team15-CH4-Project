@@ -5,9 +5,10 @@
 #include "Component//SIUIManagerComponent.h"
 #include "GameMode/SIGameMode.h"         
 #include "GameState/SIGameState.h"        
-#include "UI/SIDrawingToolWidget.h" 
+#include "UI/SIDrawingToolWidget.h"
 #include "UI/SIMainMenuWidget.h"
 #include "UI/SILobbySettingWidget.h"
+#include "UI/SIHUDWidget.h"
 
 #include "EnhancedInputComponent.h"
 #include "Engine/GameViewportClient.h"
@@ -44,6 +45,16 @@ void ASIPlayerController::Client_ReceiveSecretWord_Implementation(const FString&
 	UE_LOG(LogTemp, Warning, TEXT("====================================="));
 	UE_LOG(LogTemp, Warning, TEXT("[클라이언트] 당신의 이번 턴 출제 제시어는 [%s] 입니다!"), *SecretWord);
 	UE_LOG(LogTemp, Warning, TEXT("====================================="));
+
+	if (HUDWidget)
+	{
+		HUDWidget->SetSecretWord(SecretWord);
+	}
+	else
+	{
+		// HUD 아직 없으면 캐시해뒀다가 ShowHUDWidget 시점에 전달
+		PendingSecretWord = SecretWord;
+	}
 }
 
 // ==========================================
@@ -155,6 +166,40 @@ void ASIPlayerController::CloseLobbySettingWidget()
 	}
 
 	LobbySettingWidget->RemoveFromParent();
+}
+
+void ASIPlayerController::ShowHUDWidget()
+{
+	if (!HUDWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[PlayerController] HUDWidgetClass 미지정 - HUD 생성 실패"));
+		return;
+	}
+
+	if (!HUDWidget)
+	{
+		HUDWidget = CreateWidget<USIHUDWidget>(this, HUDWidgetClass);
+	}
+
+	if (HUDWidget)
+	{
+		HUDWidget->AddToViewport();
+
+		// HUD 생성 전에 도착한 제시어가 있으면 지금 전달
+		if (!PendingSecretWord.IsEmpty())
+		{
+			HUDWidget->SetSecretWord(PendingSecretWord);
+			PendingSecretWord.Reset();
+		}
+	}
+}
+
+void ASIPlayerController::HideHUDWidget()
+{
+	if (IsValid(HUDWidget))
+	{
+		HUDWidget->RemoveFromParent();
+	}
 }
 
 void ASIPlayerController::HandleUIConfirmed(EUIType type)
