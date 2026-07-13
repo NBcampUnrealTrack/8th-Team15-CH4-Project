@@ -166,7 +166,7 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Jump, ETriggerEvent::Started, this, &ThisClass::HandleJumpNFly);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Jump, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ToggleTransformUI, ETriggerEvent::Triggered, this, &ThisClass::ToggleUIOnlyMode);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ToggleTransformUI, ETriggerEvent::Started, this, &ThisClass::ToggleUIOnlyMode);
 		
 		// EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Preview, ETriggerEvent::Started, this, &ThisClass::StartBoxPreview);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->IncreasePreviewDistance, ETriggerEvent::Triggered, this, &ThisClass::IncreasePreviewDistance);
@@ -364,6 +364,8 @@ void ASICharacter::ToggleUIOnlyMode()
 	if (bIsUIOnlyMode)
 	{
 		GetCharacterMovement()->StopMovementImmediately();
+		PlayerController->SetIgnoreMoveInput(true);
+		PlayerController->SetIgnoreLookInput(true);
 		// BindDetailPanelDelegates();
  
 		// 1. 마우스 위치를 먼저 중앙으로 '예약' 세팅
@@ -371,9 +373,8 @@ void ASICharacter::ToggleUIOnlyMode()
 		PlayerController->GetViewportSize(ViewportSizeX, ViewportSizeY);
 		PlayerController->SetMouseLocation(ViewportSizeX / 2, ViewportSizeY / 2);
  
-		// 2. 입력 모드 설정 (이 시점에서 위젯 포커스 준비)
+		// 2. DrawingTool에 포커스를 고정하지 않고 게임과 UI 입력을 함께 받는다.
 		FInputModeGameAndUI InputMode;
-		InputMode.SetWidgetToFocus(PlayerController->GetDrawingToolWidget()->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 		InputMode.SetHideCursorDuringCapture(false);
 		PlayerController->SetInputMode(InputMode);
@@ -384,18 +385,11 @@ void ASICharacter::ToggleUIOnlyMode()
 	}
 	else
 	{
-		if (PreviewActor && ObjectEditState != EObjectEditState::Rebase)
-		{
-			// 오브젝트 편집 중이면 UI 종료 후에도 기즈모 입력 상태를 유지한다.
-			SetObjectGizmoInputMode(true);
-		}
-		else
-		{
-			// 게임 전용 모드로 복구
-			FInputModeGameOnly InputMode;
-			PlayerController->SetInputMode(InputMode);
-			PlayerController->bShowMouseCursor = false;
-		}
+		PlayerController->SetIgnoreMoveInput(false);
+		PlayerController->SetIgnoreLookInput(false);
+
+		// UI 종료 후에는 오브젝트 상태와 관계없이 Play 입력으로 복귀한다.
+		SetObjectGizmoInputMode(false);
 	}
 	
 	// 모드 전환 시 박혀있던 키 입력들 초기화
@@ -589,8 +583,8 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 		ObjectEditState = EObjectEditState::Preview;
 		UpdatePreviewTransform();
 		StartPreviewGizmo(false);
-		bIsUIOnlyMode = false;
-		SetObjectGizmoInputMode(true);
+		// UI에서 도형을 골라도 모드는 유지하고 백틱/ESC로만 Play 모드에 복귀한다.
+		SetObjectGizmoInputMode(bIsUIOnlyMode);
 		// SyncDetailPanelToPreview();
 	}
 }

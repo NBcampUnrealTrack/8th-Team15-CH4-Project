@@ -3,6 +3,7 @@
 
 #include "UI/SIDrawingToolWidget.h"
 #include "Components/Slider.h"
+#include "Components/Widget.h"
 
 namespace
 {
@@ -47,6 +48,12 @@ namespace
 void USIDrawingToolWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	// 전체 화면 배경은 클릭을 통과시키고 실제 자식 버튼만 입력을 받는다.
+	if (UWidget* RootWidget = GetRootWidget())
+	{
+		RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
 
 	ConfigureSlider(Location_X);
 	if (Location_X)
