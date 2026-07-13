@@ -10,10 +10,7 @@ class ASIGameState;
 class ASIPlayerState;
 class APlayerState;
 
-/**
- * 점수판. 모든 PlayerState의 OnScoreUpdated에 바인딩되어 점수 변화 시 리프레시하며,
- * 매치 종료 시 최종 순위를 정렬해 표시합니다.
- */
+
 UCLASS()
 class TEAMPROJECT_API USIScoreBoardWidget : public USIUserWidget
 {

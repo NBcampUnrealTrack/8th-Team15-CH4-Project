@@ -6,9 +6,7 @@
 #include "UI/SIUserWidget.h"
 #include "SIRoomEntryWidget.generated.h"
 
-/**
- * 
- */
+
 UCLASS()
 class TEAMPROJECT_API USIRoomEntryWidget : public USIUserWidget
 {

@@ -154,7 +154,7 @@ private:
 
 	virtual void SetupInputComponent() override;
 
-	void HandleUIConfirmed(EUIType type);
+	void HandleUIConfirmed(EUIType Type);
 
 	void HandleCancel();
 #pragma endregion

@@ -8,10 +8,6 @@
 
 class ASIPlayerState;
 
-/**
- * 로비 세팅 위젯. 방장 판별 및 게임 시작 요청을 담당합니다.
- * WBP 버튼 OnClicked → RequestStartGame() 을 호출하도록 바인딩하세요.
- */
 UCLASS()
 class TEAMPROJECT_API USILobbySettingWidget : public USIUserWidget
 {

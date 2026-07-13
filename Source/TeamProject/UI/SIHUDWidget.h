@@ -8,12 +8,7 @@
 #include "SIHUDWidget.generated.h"
 
 class ASIGameState;
-class APlayerState;
 
-/**
- * 인게임 HUD. GameState의 페이즈/타이머/발표자/채팅 이벤트를 받아 상태를 캐시합니다.
- * 실제 텍스트/이미지는 BP에서 캐시 값을 참조해 표시하세요.
- */
 UCLASS()
 class TEAMPROJECT_API USIHUDWidget : public USIUserWidget
 {
@@ -31,10 +26,6 @@ public:
 	// 남은 시간(초) 캐시
 	UPROPERTY(BlueprintReadOnly, Category = "HUD")
 	int32 RemainingTime = 0;
-
-	// 현재 발표자 캐시
-	UPROPERTY(BlueprintReadOnly, Category = "HUD")
-	TObjectPtr<APlayerState> CurrentPresenter = nullptr;
 
 	// PlayerController가 Client_ReceiveSecretWord에서 이 함수를 호출해 제시어 세팅
 	UFUNCTION(BlueprintCallable, Category = "HUD")
@@ -66,9 +57,6 @@ private:
 
 	UFUNCTION()
 	void HandleTimeUpdated(int32 NewTime);
-
-	UFUNCTION()
-	void HandlePresenterChanged(APlayerState* NewPresenter);
 
 	UFUNCTION()
 	void HandleChatMessage(const FChatMessagePayload& Payload);

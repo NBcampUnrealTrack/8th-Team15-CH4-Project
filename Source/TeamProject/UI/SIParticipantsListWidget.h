@@ -9,9 +9,7 @@
 class ASIGameState;
 class APlayerState;
 
-/**
- * 참가자 리스트. 접속/이탈 이벤트와 점수 갱신 이벤트를 받아 리스트를 유지합니다.
- */
+
 UCLASS()
 class TEAMPROJECT_API USIParticipantsListWidget : public USIUserWidget
 {

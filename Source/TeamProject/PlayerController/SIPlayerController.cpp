@@ -202,9 +202,9 @@ void ASIPlayerController::HideHUDWidget()
 	}
 }
 
-void ASIPlayerController::HandleUIConfirmed(EUIType type)
+void ASIPlayerController::HandleUIConfirmed(EUIType Type)
 {
-	UIManagerComponent->OpenWidget(type);
+	UIManagerComponent->OpenWidget(Type);
 }
 
 void ASIPlayerController::HandleCancel()
