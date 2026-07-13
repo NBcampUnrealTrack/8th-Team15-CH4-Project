@@ -201,6 +201,7 @@ private:
 	void SetHoveredShape(APlacedShapeActor* NewHoveredShape);
 	void StartEditPreview(FName ShapeId, const FTransform& PreviewTransform);
 	void ClearPreview();
+	void UpdateShapePanelAvailability();
 	void HandlePrimaryActionStarted();
 	void HandlePrimaryActionCompleted();
 	void ToggleRebaseMode();

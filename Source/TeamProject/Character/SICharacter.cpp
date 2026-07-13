@@ -11,6 +11,7 @@
 #include "InputMappingContext.h"
 #include "InputCoreTypes.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/Widget.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -550,9 +551,33 @@ void ASICharacter::ServerRPCSetMovementMode_Implementation(EMovementMode NewMove
 
 #pragma region Obeject
 
+void ASICharacter::UpdateShapePanelAvailability()
+{
+	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
+	USIDrawingToolWidget* DrawingTool = PlayerController ? PlayerController->GetDrawingToolWidget() : nullptr;
+	if (!DrawingTool)
+	{
+		return;
+	}
+
+	// 선택 및 재배치 중에는 기존 편집 대상을 유지하도록 도형 선택을 막는다.
+	UWidget* ShapePanel = DrawingTool->GetWidgetFromName(TEXT("HorizontalBox_Shapes"));
+	if (ShapePanel)
+	{
+		const bool bCanSelectShape = ObjectEditState != EObjectEditState::Selected
+			&& ObjectEditState != EObjectEditState::Rebase;
+		ShapePanel->SetIsEnabled(bCanSelectShape);
+	}
+}
+
 // 선택한 도형의 배치 프리뷰를 시작한다.
 void ASICharacter::StartShapePreview(FName ShapeId)
 {
+	if (ObjectEditState == EObjectEditState::Selected || ObjectEditState == EObjectEditState::Rebase)
+	{
+		return;
+	}
+
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PreviewActorClass)
 	{
 		return;
@@ -581,6 +606,7 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 		EditingOriginalShapeId = NAME_None;
 		EditingOriginalTransform = FTransform::Identity;
 		ObjectEditState = EObjectEditState::Preview;
+		UpdateShapePanelAvailability();
 		UpdatePreviewTransform();
 		StartPreviewGizmo(false);
 		// UI에서 도형을 골라도 모드는 유지하고 백틱/ESC로만 Play 모드에 복귀한다.
@@ -796,6 +822,7 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 		PreviewRotation = PreviewActor->GetActorRotation();
 		PreviewScale = PreviewActor->GetActorScale3D();
 		ObjectEditState = EObjectEditState::Selected;
+		UpdateShapePanelAvailability();
 		StartPreviewGizmo(true);
 		BeginSelectedCameraFocus();
 		SetObjectGizmoInputMode(true);
@@ -834,6 +861,7 @@ void ASICharacter::ClearPreview()
 	EditingOriginalShapeId = NAME_None;
 	EditingOriginalTransform = FTransform::Identity;
 	ObjectEditState = EObjectEditState::None;
+	UpdateShapePanelAvailability();
 
 	/* Detail Panel 관련 코드는 기즈모 편집으로 이전되어 임시 비활성화한다.
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
@@ -959,6 +987,7 @@ void ASICharacter::ToggleRebaseMode()
 		// 재배치에서는 카메라 고정을 풀고 기존 배치 추적을 사용한다.
 		EndSelectedCameraFocus();
 		ObjectEditState = EObjectEditState::Rebase;
+		UpdateShapePanelAvailability();
 		StartPreviewGizmo(false);
 		bIsUIOnlyMode = false;
 		SetObjectGizmoInputMode(false);
