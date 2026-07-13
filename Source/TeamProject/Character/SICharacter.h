@@ -185,8 +185,6 @@ private:
 	FName EditingOriginalShapeId;
 	FTransform EditingOriginalTransform;
 	EObjectEditState ObjectEditState = EObjectEditState::None;
-	FRotator ControlRotationBeforeSelection = FRotator::ZeroRotator;
-	bool bHasSavedSelectionControlRotation = false;
 	bool bApplyingGizmoTransform = false;
 	bool bIsGizmoDragging = false;
 	

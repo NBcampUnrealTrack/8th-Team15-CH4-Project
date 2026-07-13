@@ -381,19 +381,9 @@ void ASICharacter::ToggleUIOnlyMode()
 		// 3. 마지막에 커서를 노출 (이미 중앙으로 옮겨진 상태에서 등장)
 		PlayerController->bShowMouseCursor = true;
 
-		if (ObjectEditState == EObjectEditState::Rebase)
-		{
-			// 재배치 중에는 UI 모드에서만 Rotate/Scale 기즈모를 표시한다.
-			StartPreviewGizmo(false);
-		}
 	}
 	else
 	{
-		if (ObjectEditState == EObjectEditState::Rebase && PreviewTransformGizmoComponent)
-		{
-			PreviewTransformGizmoComponent->StopEditing();
-		}
-
 		if (PreviewActor && ObjectEditState != EObjectEditState::Rebase)
 		{
 			// 오브젝트 편집 중이면 UI 종료 후에도 기즈모 입력 상태를 유지한다.
@@ -474,6 +464,13 @@ void ASICharacter::ConfirmPlacement()
 	{
 		// 설치는 서버에서 확정
 		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform());
+		if (ObjectEditState == EObjectEditState::Preview && !bIsEditingExistingShape)
+		{
+			// 일반 프리뷰는 유지하여 같은 도형을 연속으로 설치한다.
+			UpdatePreviewTransform();
+			return;
+		}
+
 		ClearPreview();
 		return;
 	}
@@ -484,6 +481,13 @@ void ASICharacter::ConfirmPlacement()
 
 void ASICharacter::CancelPreview()
 {
+	if (bIsUIOnlyMode)
+	{
+		// UI 모드에서는 프리뷰를 취소하지 않고 Play 모드로만 돌아간다.
+		ToggleUIOnlyMode();
+		return;
+	}
+
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
 	{
 		return;
@@ -914,7 +918,8 @@ void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
 void ASICharacter::HandlePrimaryActionStarted()
 {
 	// 프리뷰와 선택 상태에서는 기즈모가 마우스 입력을 먼저 처리한다.
-	if (PreviewTransformGizmoComponent && PreviewTransformGizmoComponent->TryBeginMouseInteraction())
+	const bool bCanInteractWithGizmo = ObjectEditState != EObjectEditState::Rebase || bIsUIOnlyMode;
+	if (bCanInteractWithGizmo && PreviewTransformGizmoComponent && PreviewTransformGizmoComponent->TryBeginMouseInteraction())
 	{
 		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 		{
@@ -960,10 +965,7 @@ void ASICharacter::ToggleRebaseMode()
 		// 재배치에서는 카메라 고정을 풀고 기존 배치 추적을 사용한다.
 		EndSelectedCameraFocus();
 		ObjectEditState = EObjectEditState::Rebase;
-		if (PreviewTransformGizmoComponent)
-		{
-			PreviewTransformGizmoComponent->StopEditing();
-		}
+		StartPreviewGizmo(false);
 		bIsUIOnlyMode = false;
 		SetObjectGizmoInputMode(false);
 		UpdatePreviewTransform();
@@ -1048,8 +1050,6 @@ void ASICharacter::BeginSelectedCameraFocus()
 		return;
 	}
 
-	ControlRotationBeforeSelection = PlayerController->GetControlRotation();
-	bHasSavedSelectionControlRotation = true;
 	UpdateSelectedCameraFocus();
 }
 
@@ -1078,11 +1078,7 @@ void ASICharacter::UpdateSelectedCameraFocus()
 
 void ASICharacter::EndSelectedCameraFocus()
 {
-	if (bHasSavedSelectionControlRotation && GetController())
-	{
-		GetController()->SetControlRotation(ControlRotationBeforeSelection);
-	}
-	bHasSavedSelectionControlRotation = false;
+	// 선택 해제 시 현재 카메라 방향을 그대로 유지한다.
 }
 
 bool ASICharacter::IsSelectionCameraLocked() const
