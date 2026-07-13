@@ -129,3 +129,16 @@ void ASIGameMode::EndMatch()
 			ProcessServerTravel(TEXT("/Game/Maps/LobbyMap?listen"));
 		}, 5.f, false);
 }
+
+void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Message)
+{
+	// TODO: 정답 판정 (은석님)
+    
+	ASIGameState* GS = GetGameState<ASIGameState>();
+	if (!GS || !Sender) return;
+    
+	FChatMessagePayload Payload;
+	Payload.Sender = Sender->PlayerState;
+	Payload.Message = Message;
+	GS->Multicast_BroadcastChatMessage(Payload);
+}

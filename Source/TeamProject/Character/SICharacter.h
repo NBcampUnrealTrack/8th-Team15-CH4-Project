@@ -77,10 +77,6 @@ private:
 	// UI Only Mode 전환
 	void ToggleUIOnlyMode();
 
-	//UI 토글 키 테스트 (TAB)
-	void OpenParticipants();
-	void CloseParticipants();
-
 	// Preview 관련 인풋
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartBoxPreview();

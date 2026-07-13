@@ -14,7 +14,9 @@ public class TeamProject : ModuleRules
             "Engine", 
             "InputCore", 
             "EnhancedInput",
-            "UMG"
+            "UMG",
+            "Slate",
+            "SlateCore"
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {

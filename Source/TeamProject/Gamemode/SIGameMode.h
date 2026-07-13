@@ -32,6 +32,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
 	float GuessTimeLimit = 30.0f; // 정답 맞추기 시간 (기본값 30초)
+	
+	//Chat
+	void OnChatReceived(APlayerController* Sender, const FString& Message);
 
 protected:
 	// 메인 메뉴 또는 인게임 UI를 띄우기 위해 블루프린트에서 설정할 위젯 클래스

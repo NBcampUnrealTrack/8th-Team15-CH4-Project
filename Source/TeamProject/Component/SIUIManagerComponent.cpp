@@ -44,7 +44,6 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 
 	if (!FoundClass || !*FoundClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[UIMgr] WidgetClasses에 Type=%d 없음"), (int32)Type);
 		return;
 	}
 

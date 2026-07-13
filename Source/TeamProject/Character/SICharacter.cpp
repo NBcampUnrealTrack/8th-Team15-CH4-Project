@@ -176,8 +176,6 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Confirm, ETriggerEvent::Completed, this, &ThisClass::HandlePrimaryActionCompleted);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Cancel, ETriggerEvent::Started, this, &ThisClass::CancelPreview);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ResetPreviewTransform, ETriggerEvent::Started, this, &ThisClass::ResetPreviewTransform);
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Participants, ETriggerEvent::Started, this, &ThisClass::OpenParticipants);
-		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Participants, ETriggerEvent::Completed, this, &ThisClass::CloseParticipants);
 		if (PlayerCharacterInputConfig->RebaseMode)
 		{
 			EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->RebaseMode, ETriggerEvent::Started, this, &ThisClass::ToggleRebaseMode);
@@ -397,41 +395,7 @@ void ASICharacter::ToggleUIOnlyMode()
 	PlayerController->FlushPressedKeys();	
 }
 
-void ASICharacter::OpenParticipants()
-{
-	APlayerController* PC = Cast<APlayerController>(GetController());
 
-	if (!PC)
-	{
-		return;
-	}
-
-	USIUIManagerComponent* UIManagerComponent = PC->GetComponentByClass<USIUIManagerComponent>();
-
-	if (!UIManagerComponent)
-	{
-		return;
-	}
-	UIManagerComponent->OpenWidget(EUIType::Participants);
-}
-
-void ASICharacter::CloseParticipants()
-{
-	APlayerController* PC = Cast<APlayerController>(GetController());
-
-	if (!PC)
-	{
-		return;
-	}
-
-	USIUIManagerComponent* UIManagerComponent = PC->GetComponentByClass<USIUIManagerComponent>();
-
-	if (!UIManagerComponent)
-	{
-		return;
-	}
-	UIManagerComponent->CloseWidget();
-}
 
 void ASICharacter::StartBoxPreview()
 {

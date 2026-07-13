@@ -15,7 +15,6 @@ enum class EUIType : uint8
 	CreateRoom,		// 방 만들기 설정
 	RoomList,		// 방 목록
 	LobbySetting,	// 방 설정 (로비 내)
-	Participants	// 참가자 목록 (TAB)
 };
 
 USTRUCT()

@@ -2,13 +2,13 @@
 
 
 #include "PlayerController/SIPlayerController.h"
-#include "Component//SIUIManagerComponent.h"
 #include "GameMode/SIGameMode.h"         
 #include "GameState/SIGameState.h"        
 #include "UI/SIDrawingToolWidget.h"
-#include "UI/SIMainMenuWidget.h"
 #include "UI/SILobbySettingWidget.h"
 #include "UI/SIHUDWidget.h"
+#include "UI/SIParticipantsListWidget.h"
+#include "UI/SIScoreBoardWidget.h"
 
 #include "EnhancedInputComponent.h"
 #include "Engine/GameViewportClient.h"
@@ -16,8 +16,34 @@
 
 ASIPlayerController::ASIPlayerController()
 {
-	UIManagerComponent = CreateDefaultSubobject<USIUIManagerComponent>(TEXT("UIManagerComponent"));
+
 }
+
+void ASIPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if (IsLocalController())
+	{
+		TryCacheGameState();
+	}
+}
+
+void ASIPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (GameState.IsValid())
+	{
+		GameState->OnPhaseChanged.RemoveDynamic(this, &ASIPlayerController::HandlePhaseChanged);
+	}
+	
+	if (UWorld* World = GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(GameStateRetryHandle);
+	}
+	
+	Super::EndPlay(EndPlayReason);
+}
+
 
 #pragma region GameMode
 
@@ -45,15 +71,12 @@ void ASIPlayerController::Client_ReceiveSecretWord_Implementation(const FString&
 	UE_LOG(LogTemp, Warning, TEXT("====================================="));
 	UE_LOG(LogTemp, Warning, TEXT("[클라이언트] 당신의 이번 턴 출제 제시어는 [%s] 입니다!"), *SecretWord);
 	UE_LOG(LogTemp, Warning, TEXT("====================================="));
-
+	
+	CachedSecretWord = SecretWord;
+	
 	if (HUDWidget)
 	{
 		HUDWidget->SetSecretWord(SecretWord);
-	}
-	else
-	{
-		// HUD 아직 없으면 캐시해뒀다가 ShowHUDWidget 시점에 전달
-		PendingSecretWord = SecretWord;
 	}
 }
 
@@ -76,6 +99,14 @@ void ASIPlayerController::SetTime(int32 Seconds)
 {
 	UE_LOG(LogTemp, Warning, TEXT("[테스트] 타이머 변경 명령 전송: %d초"), Seconds);
 	Server_TestSetTime(Seconds);
+}
+
+void ASIPlayerController::Server_SendChat_Implementation(const FString& Message)
+{
+	if (ASIGameMode* GM = GetWorld()->GetAuthGameMode<ASIGameMode>())
+	{
+		GM->OnChatReceived(this, Message);
+	}
 }
 
 // ==========================================
@@ -124,22 +155,188 @@ void ASIPlayerController::Server_TestSetTime_Implementation(int32 Seconds)
 
 #pragma region UI
 
-void ASIPlayerController::HandleCreateRoom()
+void ASIPlayerController::ReceivedPlayer()
 {
-	UIManagerComponent->OpenWidget(EUIType::CreateRoom);
+	Super::ReceivedPlayer();
+	
+	if (IsLocalController())
+	{
+		// 게임 시작 즉시 뷰포트가 마우스를 잡도록 초기 입력 상태를 설정한다.
+		bShowMouseCursor = false;
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+
+		if (UGameViewportClient* GameViewportClient = GetWorld()->GetGameViewport())
+		{
+			GameViewportClient->SetMouseCaptureMode(EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown);
+			GameViewportClient->SetMouseLockMode(EMouseLockMode::LockAlways);
+		}
+	}
+	
 }
 
-void ASIPlayerController::HandleJoinRoom()
+void ASIPlayerController::SetupInputComponent()
 {
-	UIManagerComponent->OpenWidget(EUIType::RoomList);
+	Super::SetupInputComponent();
+	
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+
+	if (!EnhancedInputComponent)
+	{
+		return;
+	}
+
+	EnhancedInputComponent->BindAction(
+		IA_ScoreBoardWidgetCancel, 
+		ETriggerEvent::Started,
+		this,
+		&ASIPlayerController::RemovedScoreBoardWidget
+		);
+	EnhancedInputComponent->BindAction(
+		IA_ParticipantsListWidgetCancel, 
+		ETriggerEvent::Started, 
+		this, 
+		&ASIPlayerController::OpenParticipantsListWidget
+		);
+	EnhancedInputComponent->BindAction(
+		IA_ParticipantsListWidgetCancel, 
+		ETriggerEvent::Completed, 
+		this, 
+		&ASIPlayerController::CloseParticipantsListWidget
+		);
 }
 
-void ASIPlayerController::HandleQuit()
+void ASIPlayerController::RemovedScoreBoardWidget()
 {
-	UIManagerComponent->OpenWidget(EUIType::Exit);
+	if (CurrentPhase == ESIGamePhase::ResultPhase)
+	{
+		if (IsValid(ScoreBoardWidget))
+		{
+			ScoreBoardWidget->RemoveFromParent();
+		}
+	}
 }
 
-void ASIPlayerController::HandleCreateRoomConfirmed()
+void ASIPlayerController::OpenParticipantsListWidget()
+{
+	if (CurrentPhase != ESIGamePhase::None && CurrentPhase != ESIGamePhase::ResultPhase)
+	{
+		if (ParticipantsListWidgetClass)
+		{
+			ParticipantsListWidget = CreateWidget<USIParticipantsListWidget>(this, ParticipantsListWidgetClass);
+		
+			ParticipantsListWidget->AddToViewport();
+		}
+	}
+}
+
+void ASIPlayerController::CloseParticipantsListWidget()
+{
+	if (ParticipantsListWidget)
+	{
+		ParticipantsListWidget->RemoveFromParent();
+	}
+}
+
+void ASIPlayerController::CloseAllPhaseWidgets()
+{
+	if (LobbySettingWidget)
+	{
+		LobbySettingWidget->RemoveFromParent();
+		LobbySettingWidget = nullptr;
+	}
+	
+	if (DrawingToolWidget)
+	{
+		DrawingToolWidget->RemoveFromParent();
+		DrawingToolWidget = nullptr;
+	}
+	
+	if (HUDWidget)
+	{
+		HUDWidget->RemoveFromParent();
+		HUDWidget = nullptr;
+	}
+	
+	if (ScoreBoardWidget)
+	{
+		ScoreBoardWidget->RemoveFromParent();
+		ScoreBoardWidget = nullptr;
+	}
+}
+
+void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
+{
+	CurrentPhase = NewPhase;
+	CloseAllPhaseWidgets();
+	
+	switch (NewPhase)
+	{
+	
+	case ESIGamePhase::None:
+		break;
+		
+	case ESIGamePhase::LobbyPhase:
+		if (LobbySettingWidgetClass)
+		{
+			LobbySettingWidget = CreateWidget<USILobbySettingWidget>(this, LobbySettingWidgetClass);
+			LobbySettingWidget->AddToViewport();
+		}
+		break;
+
+	case ESIGamePhase::BuildPhase:
+		if (HUDWidgetClass && DrawingToolWidgetClass)
+		{
+			HUDWidget = CreateWidget<USIHUDWidget>(this, HUDWidgetClass);
+			DrawingToolWidget = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidgetClass);
+			
+			HUDWidget->SetSecretWord(CachedSecretWord);
+			
+			HUDWidget->AddToViewport();
+			DrawingToolWidget->AddToViewport();
+		}
+		break;
+
+	case ESIGamePhase::GuessPhase:
+		if (HUDWidgetClass)
+		{
+			HUDWidget = CreateWidget<USIHUDWidget>(this, HUDWidgetClass);
+			HUDWidget->AddToViewport();
+		}
+		break;
+
+	case ESIGamePhase::ResultPhase:
+		if (ScoreBoardWidgetClass)
+		{
+			ScoreBoardWidget = CreateWidget<USIScoreBoardWidget>(this, ScoreBoardWidgetClass);
+			ScoreBoardWidget->AddToViewport();
+		}
+		break;
+	}
+	
+}
+
+void ASIPlayerController::TryCacheGameState()
+{
+	ASIGameState* GS = GetWorld()->GetGameState<ASIGameState>();
+	if (!IsValid(GS))
+	{
+		GameStateRetryHandle = GetWorld()->GetTimerManager().SetTimerForNextTick(this, &ASIPlayerController::TryCacheGameState);
+		return;
+	}
+	
+	GameState = GS;
+	
+	if (!GameState.IsValid())
+	{
+		return;
+	}
+	
+	GameState->OnPhaseChanged.AddDynamic(this, &ASIPlayerController::HandlePhaseChanged);
+	HandlePhaseChanged(GS->CurrentGamePhase);
+}
+
+void ASIPlayerController::StartRoomCreation()
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
 
@@ -166,124 +363,6 @@ void ASIPlayerController::CloseLobbySettingWidget()
 	}
 
 	LobbySettingWidget->RemoveFromParent();
-}
-
-void ASIPlayerController::ShowHUDWidget()
-{
-	if (!HUDWidgetClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[PlayerController] HUDWidgetClass 미지정 - HUD 생성 실패"));
-		return;
-	}
-
-	if (!HUDWidget)
-	{
-		HUDWidget = CreateWidget<USIHUDWidget>(this, HUDWidgetClass);
-	}
-
-	if (HUDWidget)
-	{
-		HUDWidget->AddToViewport();
-
-		// HUD 생성 전에 도착한 제시어가 있으면 지금 전달
-		if (!PendingSecretWord.IsEmpty())
-		{
-			HUDWidget->SetSecretWord(PendingSecretWord);
-			PendingSecretWord.Reset();
-		}
-	}
-}
-
-void ASIPlayerController::HideHUDWidget()
-{
-	if (IsValid(HUDWidget))
-	{
-		HUDWidget->RemoveFromParent();
-	}
-}
-
-void ASIPlayerController::HandleUIConfirmed(EUIType Type)
-{
-	UIManagerComponent->OpenWidget(Type);
-}
-
-void ASIPlayerController::HandleCancel()
-{
-	UIManagerComponent->CloseWidget();
-}
-
-void ASIPlayerController::ReceivedPlayer()
-{
-	Super::ReceivedPlayer();
-	
-	//인스턴스가 없을 때, StaticClass만 존재한다면
-	if (!DrawingToolWidgetInstance && DrawingToolWidget)
-	{
-		// StaticClass를 통해 Instance화
-		DrawingToolWidgetInstance = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidget);
-	}
-	
-	// 인스턴스가 존재한다면
-	if (DrawingToolWidgetInstance)
-	{
-		// 뷰포트에 노출
-		DrawingToolWidgetInstance->AddToViewport();
-	}
-
-	if (IsLocalController())
-	{
-		// 게임 시작 즉시 뷰포트가 마우스를 잡도록 초기 입력 상태를 설정한다.
-		bShowMouseCursor = false;
-		FInputModeGameOnly InputMode;
-		SetInputMode(InputMode);
-
-		if (UGameViewportClient* GameViewportClient = GetWorld()->GetGameViewport())
-		{
-			GameViewportClient->SetMouseCaptureMode(EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown);
-			GameViewportClient->SetMouseLockMode(EMouseLockMode::LockAlways);
-		}
-	}
-	
-	// // 메인메뉴 띄우고 바인딩하는 코드. 결과물 합치고 난 이후에 주석 해제하기.
-	// bShowMouseCursor = true;
-	//
-	// FInputModeGameAndUI InputMode;
-	// SetInputMode(InputMode);
-	//
-	// if (!IsLocalController())
-	// {
-	// 	return;
-	// }
-	//
-	// UIManagerComponent->OnUIConfirmed.AddDynamic(this, &ASIPlayerController::HandleUIConfirmed);
-	// UIManagerComponent->OnCreateRoomRequested.AddDynamic(this, &ASIPlayerController::OnCreateRoomClicked);
-	//
-	// TObjectPtr<USIMainMenuWidget> MainMenuWidget = CreateWidget<USIMainMenuWidget>(this, MainMenuWidgetClass);
-	//
-	// if (!IsValid(MainMenuWidget))
-	// {
-	// 	return;
-	// }
-	//
-	// MainMenuWidget->OnClickedCreateRoomButton.AddDynamic(this, &ASIPlayerController::HandleCreateRoom);
-	// MainMenuWidget->OnClickedJoinRoomButton.AddDynamic(this, &ASIPlayerController::HandleJoinRoom);
-	// MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASIPlayerController::HandleQuit);
-	//
-	// MainMenuWidget->AddToViewport();
-}
-
-void ASIPlayerController::SetupInputComponent()
-{
-	Super::SetupInputComponent();
-	
-	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
-
-	if (!EnhancedInputComponent)
-	{
-		return;
-	}
-
-	EnhancedInputComponent->BindAction(IA_UICancel, ETriggerEvent::Started, this, &ASIPlayerController::HandleCancel);
 }
 
 #pragma endregion

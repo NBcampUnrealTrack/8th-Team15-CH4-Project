@@ -27,8 +27,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USIMainMenuWidget> MainMenuWidgetClass;
 	
-	TSubclassOf<USIUserWidget> LobbySettingWidgetClass;
-	
 	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
 	

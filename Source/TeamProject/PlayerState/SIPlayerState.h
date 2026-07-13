@@ -26,7 +26,7 @@ public:
 
 	// 현재 게임에서 획득한 점수
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentScore, Transient, BlueprintReadOnly, Category = "GameData|Score")
-	int32 CurrentScore;
+	int32 CurrentScore = 0;
 
 	// 서버에서 점수가 변경되었을 때 클라이언트에서 실행되는 함수
 	UFUNCTION()

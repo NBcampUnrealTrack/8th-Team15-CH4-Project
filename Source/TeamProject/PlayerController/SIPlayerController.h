@@ -5,10 +5,13 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Component/SIUIManagerComponent.h"
+#include "Enums/SITypes.h"
 #include "SIPlayerController.generated.h"
 
-class USIUIManagerComponent;
+class ASIGameState;
 
+class USIParticipantsListWidget;
+class USIScoreBoardWidget;
 class USIDrawingToolWidget;
 class USIMainMenuWidget;
 class USILobbySettingWidget;
@@ -28,7 +31,11 @@ class TEAMPROJECT_API ASIPlayerController : public APlayerController
 public:
 	ASIPlayerController();
 
-
+protected:
+	virtual void BeginPlay() override;	
+	
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;;
+	
 #pragma region GameMode
 
 public:
@@ -68,95 +75,96 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_TestSetTime(int32 Seconds);
-
+	
+	// ==========================================
+	// Chat
+	// ==========================================
+	UFUNCTION(Server, Reliable)
+	void Server_SendChat(const FString& Message);
+	
+	
 #pragma endregion 
 
 #pragma region UI
-
-	//========== DrawingTool UI Test ==========
-protected:
-	// 액터 변형 관련 UI Widget Class
-	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<USIDrawingToolWidget> DrawingToolWidget;
-
-	// 액터 변형 관련 UI Widget Instance
-	UPROPERTY()
-	TObjectPtr<USIDrawingToolWidget> DrawingToolWidgetInstance;
-
-public:
-	USIDrawingToolWidget* GetDrawingToolWidget() const { return DrawingToolWidgetInstance; };
-
-	//========== MainMenuWidget ==========
+	
+	//========== UI Common Used Var & Func ==========
 private:
-	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<USIMainMenuWidget> MainMenuWidgetClass;;
+	UPROPERTY(EditDefaultsOnly, Category= "IA_UICancel" , meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> IA_ScoreBoardWidgetCancel;
+	
+	UPROPERTY(EditDefaultsOnly, Category= "IA_UICancel" , meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> IA_ParticipantsListWidgetCancel;
+	
+	ESIGamePhase CurrentPhase = ESIGamePhase::None;
+	
+	TWeakObjectPtr<ASIGameState> GameState;
+	
+	FTimerHandle GameStateRetryHandle;
+	
+	FString CachedSecretWord;
+	
+private:
+	virtual void ReceivedPlayer() override;
+
+	virtual void SetupInputComponent() override;
+	
+	UFUNCTION()
+	void HandlePhaseChanged(ESIGamePhase NewPhase);
+	
+	void TryCacheGameState();
+	
+	void RemovedScoreBoardWidget();
+	
+	void OpenParticipantsListWidget();
+	
+	void CloseParticipantsListWidget();
+	
+	void CloseAllPhaseWidgets();
 
 private:
-	UFUNCTION()
-	void HandleCreateRoom();
-
-	UFUNCTION()
-	void HandleJoinRoom();
-
-	UFUNCTION()
-	void HandleQuit();
-
 	//========== LobbySettingWidget ==========
-private:
-	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditDefaultsOnly, Category = "LobbySettingWidget", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USILobbySettingWidget> LobbySettingWidgetClass;
 
 	UPROPERTY()
 	TObjectPtr<USILobbySettingWidget> LobbySettingWidget;
 
-	//========== HUDWidget ==========
-private:
-	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"), Category = "UI")
-	TSubclassOf<USIHUDWidget> HUDWidgetClass;
-
-	UPROPERTY()
-	TObjectPtr<USIHUDWidget> HUDWidget;
-
-	// Client_ReceiveSecretWord가 HUD 생성 전에 도착한 경우를 위한 캐시
-	FString PendingSecretWord;
-
-public:
-	USIHUDWidget* GetHUDWidget() const { return HUDWidget; }
-
-	// 인게임 진입 시 호출해 HUD 생성 및 뷰포트 부착
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void ShowHUDWidget();
-
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void HideHUDWidget();
-
-private:
 	UFUNCTION()
-	void HandleCreateRoomConfirmed();
+	void StartRoomCreation();
 
 	void OpenLobbySettingWidget();
 
 	void CloseLobbySettingWidget();
+	
+	//========== DrawingToolWidget ==========
+	UPROPERTY(EditAnywhere, Category = "DrawingToolWidget", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USIDrawingToolWidget> DrawingToolWidgetClass;
+	
+	UPROPERTY()
+	TObjectPtr<USIDrawingToolWidget> DrawingToolWidget;
+	
+	//========== HUDWidget ==========
+	UPROPERTY(EditDefaultsOnly, Category= "HUDWidget", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USIHUDWidget> HUDWidgetClass;
 
-	//========== Remove UI ==========
-	UPROPERTY(EditDefaultsOnly, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> IA_UICancel;
-
-
-	//========== UI Comp & FUNCS ==========
-private:
-	UPROPERTY(EditAnywhere, Category = "UIManagerComponent", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USIUIManagerComponent> UIManagerComponent;
-
-
-private:
-	virtual void ReceivedPlayer() override;
-
-	virtual void SetupInputComponent() override;
-
-	void HandleUIConfirmed(EUIType Type);
-
-	void HandleCancel();
+	UPROPERTY()
+	TObjectPtr<USIHUDWidget> HUDWidget;
+	
+	
+	//========== ScoreBoardWidget ==========
+	UPROPERTY(EditDefaultsOnly, Category= "ScoreBoardWidget", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USIScoreBoardWidget> ScoreBoardWidgetClass;
+	
+	UPROPERTY()
+	TObjectPtr<USIScoreBoardWidget> ScoreBoardWidget;
+	
+	//========== ParticipantsListWidget ==========
+	UPROPERTY(EditDefaultsOnly, Category= "ParticipantsListWidget", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USIParticipantsListWidget> ParticipantsListWidgetClass;
+	
+	UPROPERTY()
+	TObjectPtr<USIParticipantsListWidget> ParticipantsListWidget;
+	
 #pragma endregion
 	
 
