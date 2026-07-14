@@ -120,8 +120,7 @@ private:
 	void CloseParticipantsListWidget();
 	
 	void CloseAllPhaseWidgets();
-
-private:
+	
 	//========== LobbySettingWidget ==========
 	UPROPERTY(EditDefaultsOnly, Category = "LobbySettingWidget", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USILobbySettingWidget> LobbySettingWidgetClass;
@@ -140,9 +139,11 @@ private:
 	UPROPERTY(EditAnywhere, Category = "DrawingToolWidget", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USIDrawingToolWidget> DrawingToolWidgetClass;
 	
+public:
 	UPROPERTY()
 	TObjectPtr<USIDrawingToolWidget> DrawingToolWidget;
 	
+private:
 	//========== HUDWidget ==========
 	UPROPERTY(EditDefaultsOnly, Category= "HUDWidget", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USIHUDWidget> HUDWidgetClass;

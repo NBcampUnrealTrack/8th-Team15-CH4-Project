@@ -518,14 +518,19 @@ void ASICharacter::ServerRPCSetMovementMode_Implementation(EMovementMode NewMove
 void ASICharacter::UpdateShapePanelAvailability()
 {
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
-	USIDrawingToolWidget* DrawingTool = PlayerController ? PlayerController->GetDrawingToolWidget() : nullptr;
-	if (!DrawingTool)
+	
+	if (IsValid(PlayerController))
 	{
 		return;
 	}
-
+	
+	if (!PlayerController->DrawingToolWidget)
+	{
+		return;
+	}
+	
 	// 선택 및 재배치 중에는 기존 편집 대상을 유지하도록 도형 선택을 막는다.
-	UWidget* ShapePanel = DrawingTool->GetWidgetFromName(TEXT("HorizontalBox_Shapes"));
+	UWidget* ShapePanel = PlayerController->DrawingToolWidget->GetWidgetFromName(TEXT("HorizontalBox_Shapes"));
 	if (ShapePanel)
 	{
 		const bool bCanSelectShape = ObjectEditState != EObjectEditState::Selected
