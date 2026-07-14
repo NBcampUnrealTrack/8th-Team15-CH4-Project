@@ -60,6 +60,19 @@ ASIGameMode::ASIGameMode()
 	}
 }
 
+void ASIGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	{
+		if (SIState->CurrentGamePhase == ESIGamePhase::None)
+		{
+			SIState->SetGamePhase(ESIGamePhase::LobbyPhase);
+		}
+	}
+}
+
 void ASIGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);

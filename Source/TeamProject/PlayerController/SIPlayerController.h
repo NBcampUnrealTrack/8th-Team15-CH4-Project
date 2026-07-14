@@ -152,7 +152,6 @@ private:
 	UPROPERTY()
 	TObjectPtr<USIHUDWidget> HUDWidget;
 	
-	
 	//========== ScoreBoardWidget ==========
 	UPROPERTY(EditDefaultsOnly, Category= "ScoreBoardWidget", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USIScoreBoardWidget> ScoreBoardWidgetClass;

@@ -220,6 +220,7 @@ void ASIPlayerController::RemovedScoreBoardWidget()
 
 void ASIPlayerController::OpenParticipantsListWidget()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Tab] OpenParticipants called. Phase=%d"), (int32)CurrentPhase);
 	if (CurrentPhase != ESIGamePhase::None && CurrentPhase != ESIGamePhase::ResultPhase)
 	{
 		if (ParticipantsListWidgetClass)
@@ -235,6 +236,7 @@ void ASIPlayerController::OpenParticipantsListWidget()
 
 void ASIPlayerController::CloseParticipantsListWidget()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Tab] Close called!"));
 	if (ParticipantsListWidget)
 	{
 		ParticipantsListWidget->RemoveFromParent();

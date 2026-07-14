@@ -8,6 +8,8 @@
 
 class ASIPlayerState;
 
+class UButton;
+
 UCLASS()
 class TEAMPROJECT_API USILobbySettingWidget : public USIUserWidget
 {
@@ -28,8 +30,13 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
-
+	virtual void NativeDestruct() override; 
+	
 private:
 	// 로컬 PlayerController의 SIPlayerState를 얻어 bIsHost 캐시
 	void ResolveHostStatus();
+	
+private:
+	UPROPERTY(Meta = (BindWidget))
+	TObjectPtr<UButton> Button_GameStart;
 };

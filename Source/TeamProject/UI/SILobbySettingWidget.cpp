@@ -2,14 +2,31 @@
 
 #include "UI/SILobbySettingWidget.h"
 #include "PlayerState/SIPlayerState.h"
+
 #include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
+#include "Components/Button.h"
 
 void USILobbySettingWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
 	ResolveHostStatus();
+	
+	if (Button_GameStart)
+	{
+		Button_GameStart->OnClicked.AddDynamic(this, &USILobbySettingWidget::RequestStartGame);
+	}
+}
+
+void USILobbySettingWidget::NativeDestruct()
+{
+	if (Button_GameStart)
+	{
+		Button_GameStart->OnClicked.RemoveDynamic(this, &USILobbySettingWidget::RequestStartGame);
+	}
+	
+	Super::NativeDestruct();
 }
 
 void USILobbySettingWidget::RequestStartGame()

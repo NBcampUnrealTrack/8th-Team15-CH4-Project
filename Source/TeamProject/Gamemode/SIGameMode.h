@@ -18,6 +18,7 @@ class TEAMPROJECT_API ASIGameMode : public AGameMode
 public:
 	ASIGameMode();
 
+	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
