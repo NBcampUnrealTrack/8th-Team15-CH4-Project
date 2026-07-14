@@ -7,9 +7,12 @@
 #include "Enums/SITypes.h"
 #include "SIHUDWidget.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGuessSubmitted, const FString&, Guess);
+
 class UTextBlock;
 class UScrollBox;
 class UEditableText;
+class UVerticalBox;
 
 class ASIGameState;
 class ASIPlayerState;
@@ -34,6 +37,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "HUD")
 	int32 RemainingTime = 0;
 	
+	UPROPERTY()
+	FOnGuessSubmitted OnGuessSubmitted;
+	
 	UFUNCTION()
 	void SetSecretWord(const FString& NewSecretWord);
 	
@@ -56,13 +62,27 @@ private:
 	UPROPERTY(meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USIChatLineWidget> ChatLineWidgetClass;
 	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UEditableText> EditableText_AnswerInput;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UVerticalBox> VerticalBox_CorrectAnswer;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UVerticalBox> VerticalBox_InCorrectAnswer;
+	
 	TWeakObjectPtr<ASIPlayerState> CachedPlayerState;
+	
+	FTimerHandle ResultHideTimerHandle;
 	
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 private:
+	void ShowResult(bool bCorrect);
+	void HideResult();
+	
 	UFUNCTION()
 	void HandlePhaseChanged(ESIGamePhase NewPhase);
 
@@ -76,7 +96,10 @@ private:
 	void HandleScoreUpdated(int32 NewScore);
 	
 	UFUNCTION()
-	void HandleChatCommitted(const FText& Text, ETextCommit::Type CommitMethod);
+	void HandleChatCommitted(const FText& Chat, ETextCommit::Type CommitMethod);
+	
+	UFUNCTION()
+	void HandleAnswerCommitted(const FText& Answer, ETextCommit::Type CommitMethod);
 	
 	// 바인딩된 GameState (해제 시 참조 필요)
 	TWeakObjectPtr<ASIGameState> CachedGameState;

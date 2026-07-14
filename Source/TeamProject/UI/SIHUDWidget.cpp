@@ -8,6 +8,7 @@
 #include "Components/TextBlock.h"
 #include "Components/ScrollBox.h"
 #include "Components/EditableText.h"
+#include "Components/VerticalBox.h"
 
 void USIHUDWidget::NativeConstruct()
 {
@@ -43,6 +44,21 @@ void USIHUDWidget::NativeConstruct()
 	{
 		EditableText_ChatInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleChatCommitted);
 	}
+	
+	if (IsValid(EditableText_AnswerInput))
+	{
+		EditableText_AnswerInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
+	}
+	
+	if (IsValid(VerticalBox_CorrectAnswer))
+	{
+		VerticalBox_CorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	
+	if (IsValid(VerticalBox_InCorrectAnswer))
+	{
+		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void USIHUDWidget::NativeDestruct()
@@ -64,7 +80,48 @@ void USIHUDWidget::NativeDestruct()
 		EditableText_ChatInput->OnTextCommitted.RemoveDynamic(this, &USIHUDWidget::HandleChatCommitted);
 	}
 	
+	if (IsValid(EditableText_AnswerInput))
+	{
+		EditableText_AnswerInput->OnTextCommitted.RemoveDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
+	}
+	
+	GetWorld()->GetTimerManager().ClearTimer(ResultHideTimerHandle);
+	
 	Super::NativeDestruct();
+}
+
+void USIHUDWidget::ShowResult(bool bCorrect)
+{
+	if (!IsValid(VerticalBox_CorrectAnswer) || !IsValid(VerticalBox_InCorrectAnswer))
+	{
+		return;
+	}
+	
+	if (bCorrect)
+	{
+		VerticalBox_CorrectAnswer->SetVisibility(ESlateVisibility::Visible);
+		
+		GetWorld()->GetTimerManager().SetTimer(ResultHideTimerHandle, this, &USIHUDWidget::HideResult, 1.5f, false);
+	}
+	else
+	{
+		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Visible);
+		
+		GetWorld()->GetTimerManager().SetTimer(ResultHideTimerHandle, this, &USIHUDWidget::HideResult, 1.5f, false);
+	}
+}
+
+void USIHUDWidget::HideResult()
+{
+	if (IsValid(VerticalBox_CorrectAnswer))
+	{
+		VerticalBox_CorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	
+	if (IsValid(VerticalBox_InCorrectAnswer))
+	{
+		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void USIHUDWidget::SetSecretWord(const FString& NewSecretWord)
@@ -80,6 +137,20 @@ void USIHUDWidget::SetSecretWord(const FString& NewSecretWord)
 void USIHUDWidget::HandlePhaseChanged(ESIGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
+	
+	if (!EditableText_AnswerInput)
+	{
+		return;
+	}
+	
+	if (NewPhase == ESIGamePhase::BuildPhase)
+	{
+		EditableText_AnswerInput->SetVisibility(ESlateVisibility::Hidden);
+	}
+	else if (NewPhase == ESIGamePhase::GuessPhase)
+	{
+		EditableText_AnswerInput->SetVisibility(ESlateVisibility::Visible);
+	}
 }
 
 void USIHUDWidget::HandleTimeUpdated(int32 NewTime)
@@ -120,11 +191,11 @@ void USIHUDWidget::HandleScoreUpdated(int32 NewScore)
 	Text_Score->SetText(FText::Format(INVTEXT("스코어 - {0}"), NewScore));
 }
 
-void USIHUDWidget::HandleChatCommitted(const FText& Text, ETextCommit::Type CommitMethod)
+void USIHUDWidget::HandleChatCommitted(const FText& Chat, ETextCommit::Type CommitMethod)
 {
 	if (CommitMethod != ETextCommit::OnEnter) return;
     
-	FString Message = Text.ToString().TrimStartAndEnd();
+	FString Message = Chat.ToString().TrimStartAndEnd();
 	if (Message.IsEmpty()) return;
     
 	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
@@ -133,4 +204,19 @@ void USIHUDWidget::HandleChatCommitted(const FText& Text, ETextCommit::Type Comm
 	}
     
 	EditableText_ChatInput->SetText(FText::GetEmpty());
+}
+
+void USIHUDWidget::HandleAnswerCommitted(const FText& Answer, ETextCommit::Type CommitMethod)
+{
+	if (CommitMethod != ETextCommit::OnEnter) return;
+    
+	FString Message = Answer.ToString().TrimStartAndEnd();
+	if (Message.IsEmpty()) return;
+    
+	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
+	{
+		PC->Server_SubmitAnswer(Message);
+	}
+	
+	EditableText_AnswerInput->SetText(FText::GetEmpty());
 }
