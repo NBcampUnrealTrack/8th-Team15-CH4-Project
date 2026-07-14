@@ -18,6 +18,7 @@ class USILobbySettingWidget;
 class USIHUDWidget;
 
 class UInputAction;
+class USoundBase;
 
 
 /**
@@ -166,7 +167,14 @@ private:
 	UPROPERTY()
 	TObjectPtr<USIParticipantsListWidget> ParticipantsListWidget;
 	
-#pragma endregion
+	#pragma endregion
 	
-
+#pragma region Sound
+	UPROPERTY(EditAnywhere, Category = "UI|Sound")
+	TObjectPtr<USoundBase> TabOpenSound;
+	
+	UPROPERTY(EditAnywhere, Category = "UI|Sound")
+	TObjectPtr<USoundBase> TabCloseSound;
+	
+#pragma endregion
 };

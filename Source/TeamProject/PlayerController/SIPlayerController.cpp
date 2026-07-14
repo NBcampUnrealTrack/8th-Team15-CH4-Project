@@ -13,6 +13,7 @@
 #include "EnhancedInputComponent.h"
 #include "Engine/GameViewportClient.h"
 #include "GameInstance/SIGameInstance.h"
+#include "Kismet/GameplayStatics.h"
 
 ASIPlayerController::ASIPlayerController()
 {
@@ -226,6 +227,8 @@ void ASIPlayerController::OpenParticipantsListWidget()
 			ParticipantsListWidget = CreateWidget<USIParticipantsListWidget>(this, ParticipantsListWidgetClass);
 		
 			ParticipantsListWidget->AddToViewport();
+			
+			UGameplayStatics::PlaySound2D(GetWorld(), TabOpenSound);
 		}
 	}
 }
@@ -235,6 +238,8 @@ void ASIPlayerController::CloseParticipantsListWidget()
 	if (ParticipantsListWidget)
 	{
 		ParticipantsListWidget->RemoveFromParent();
+		
+		UGameplayStatics::PlaySound2D(GetWorld(), TabCloseSound);
 	}
 }
 
