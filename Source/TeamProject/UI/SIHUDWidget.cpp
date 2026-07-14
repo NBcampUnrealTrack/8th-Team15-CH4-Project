@@ -70,8 +70,11 @@ void USIHUDWidget::NativeDestruct()
 void USIHUDWidget::SetSecretWord(const FString& NewSecretWord)
 {
 	CurrentSecretWord = NewSecretWord;
-	
-	Text_Timer->SetText(FText::Format(INVTEXT("제시어 - {0}"), FText::FromString(NewSecretWord)));
+
+	if (IsValid(Text_Keyword))
+	{
+		Text_Keyword->SetText(FText::Format(INVTEXT("제시어 - {0}"), FText::FromString(NewSecretWord)));
+	}
 }
 
 void USIHUDWidget::HandlePhaseChanged(ESIGamePhase NewPhase)

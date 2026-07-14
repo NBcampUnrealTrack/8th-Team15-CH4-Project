@@ -58,7 +58,7 @@ void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answ
 		ASIGameMode* GameMode = GetWorld()->GetAuthGameMode<ASIGameMode>();
 		if (GameMode)
 		{
-			GameMode->OnAnswerSubmitted(this, Answer);
+			GameMode->OnChatReceived(this, Answer);
 			UE_LOG(LogTemp, Warning, TEXT("[서버] 클라이언트가 제출한 단어 수신: %s"), *Answer);
 		}
 	}
@@ -123,15 +123,15 @@ void ASIPlayerController::Server_TestSetPhase_Implementation(int32 PhaseIndex)
 			switch (PhaseIndex)
 			{
 			case 1:
-				SIGameState->CurrentGamePhase = ESIGamePhase::BuildPhase;
+				SIGameState->SetGamePhase(ESIGamePhase::BuildPhase);
 				UE_LOG(LogTemp, Warning, TEXT("[Server] Changed to BuildPhase"));
 				break;
 			case 2:
-				SIGameState->CurrentGamePhase = ESIGamePhase::GuessPhase;
+				SIGameState->SetGamePhase(ESIGamePhase::GuessPhase);
 				UE_LOG(LogTemp, Warning, TEXT("[Server] Changed to GuessPhase"));
 				break;
 			default:
-				SIGameState->CurrentGamePhase = ESIGamePhase::None;
+				SIGameState->SetGamePhase(ESIGamePhase::None);
 				UE_LOG(LogTemp, Warning, TEXT("[Server] Changed to None"));
 				break;
 			}
@@ -146,7 +146,7 @@ void ASIPlayerController::Server_TestSetTime_Implementation(int32 Seconds)
 		ASIGameState* SIGameState = GetWorld()->GetGameState<ASIGameState>();
 		if (SIGameState)
 		{
-			SIGameState->RemainingTime = Seconds;
+			SIGameState->SetRemainingTime(Seconds);
 			UE_LOG(LogTemp, Warning, TEXT("[Server] Timer set to %d seconds"), Seconds);
 		}
 	}

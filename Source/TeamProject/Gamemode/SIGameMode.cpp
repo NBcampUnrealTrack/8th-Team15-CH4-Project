@@ -1,144 +1,401 @@
 #include "SIGameMode.h"
+
+#include "Engine/DataTable.h"
+#include "GameFramework/PlayerState.h"
 #include "GameState/SIGameState.h"
 #include "PlayerController/SIPlayerController.h"
 #include "PlayerState/SIPlayerState.h"
-#include "GameFramework/PlayerState.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
+#include "UObject/UnrealType.h"
+
+namespace
+{
+	constexpr int32 MaxPlayers = 8;
+	constexpr int32 MaxChatLength = 256;
+
+	bool IsKeywordProperty(const FProperty* Property)
+	{
+		if (!Property)
+		{
+			return false;
+		}
+
+		const FString PropertyName = Property->GetName();
+		const FString DisplayName = Property->GetDisplayNameText().ToString();
+		return PropertyName.Equals(TEXT("Keyword"), ESearchCase::IgnoreCase)
+			|| PropertyName.StartsWith(TEXT("Keyword_"), ESearchCase::IgnoreCase)
+			|| DisplayName.Equals(TEXT("Keyword"), ESearchCase::IgnoreCase);
+	}
+
+	FString ReadKeywordValue(const FProperty* Property, const uint8* RowData)
+	{
+		if (const FStrProperty* StringProperty = CastField<FStrProperty>(Property))
+		{
+			return StringProperty->GetPropertyValue_InContainer(RowData);
+		}
+
+		if (const FTextProperty* TextProperty = CastField<FTextProperty>(Property))
+		{
+			return TextProperty->GetPropertyValue_InContainer(RowData).ToString();
+		}
+
+		if (const FNameProperty* NameProperty = CastField<FNameProperty>(Property))
+		{
+			return NameProperty->GetPropertyValue_InContainer(RowData).ToString();
+		}
+
+		return FString();
+	}
+}
 
 ASIGameMode::ASIGameMode()
 {
-	// GameStateClass = ASIGameState::StaticClass();
-	// PlayerControllerClass = ASIPlayerController::StaticClass();
-
-	CurrentWorkspaceIndex = -1;
+	static ConstructorHelpers::FObjectFinder<UDataTable> KeywordTableFinder(
+		TEXT("/Game/Shape_It/Game/Keyword.Keyword"));
+	if (KeywordTableFinder.Succeeded())
+	{
+		KeywordDataTable = KeywordTableFinder.Object;
+	}
 }
 
 void ASIGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// 최대 정원 8명 제한 유지
-	if (NewPlayer && PlayerOrderList.Num() < 8)
+	if (!IsValid(NewPlayer) || PlayerOrderList.Num() >= MaxPlayers)
 	{
-		PlayerOrderList.Add(NewPlayer);
+		return;
 	}
+
+	PlayerOrderList.Add(NewPlayer);
+
+	if (ASIPlayerState* PlayerState = NewPlayer->GetPlayerState<ASIPlayerState>())
+	{
+		PlayerState->bIsHost = PlayerOrderList.Num() == 1;
+
+		if (ASIGameState* SIState = GetGameState<ASIGameState>())
+		{
+			SIState->Multicast_BroadcastPlayerJoined(PlayerState);
+		}
+	}
+}
+
+void ASIGameMode::Logout(AController* Exiting)
+{
+	APlayerController* ExitingPlayer = Cast<APlayerController>(Exiting);
+	APlayerState* ExitingPlayerState = IsValid(Exiting) ? Exiting->PlayerState : nullptr;
+	const int32 RemovedIndex = PlayerOrderList.IndexOfByKey(ExitingPlayer);
+	const ASIGameState* CurrentSIState = GetGameState<ASIGameState>();
+	const bool bRemovedCurrentWorkspaceOwner = RemovedIndex == CurrentWorkspaceIndex
+		&& CurrentSIState
+		&& CurrentSIState->CurrentGamePhase == ESIGamePhase::GuessPhase;
+
+	if (RemovedIndex != INDEX_NONE)
+	{
+		PlayerOrderList.RemoveAt(RemovedIndex);
+		PlayerAssignedWords.Remove(ExitingPlayer);
+		CorrectPlayersThisTurn.Remove(ExitingPlayer);
+
+		if (RemovedIndex < CurrentWorkspaceIndex)
+		{
+			--CurrentWorkspaceIndex;
+		}
+	}
+
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	{
+		if (IsValid(ExitingPlayerState))
+		{
+			SIState->Multicast_BroadcastPlayerLeft(ExitingPlayerState);
+		}
+
+		SIState->TotalRounds = PlayerOrderList.Num();
+	}
+
+	if (!PlayerOrderList.IsEmpty())
+	{
+		if (ASIPlayerState* NewHostState = PlayerOrderList[0]->GetPlayerState<ASIPlayerState>())
+		{
+			NewHostState->bIsHost = true;
+		}
+	}
+
+	Super::Logout(Exiting);
+
+	if (bRemovedCurrentWorkspaceOwner)
+	{
+		GetWorldTimerManager().ClearTimer(GameTimerHandle);
+		GetWorldTimerManager().SetTimerForNextTick(this, &ASIGameMode::StartNextGuessTurn);
+	}
+}
+
+bool ASIGameMode::AssignWordsToPlayers()
+{
+	PlayerAssignedWords.Empty();
+
+	if (!KeywordDataTable || !KeywordDataTable->GetRowStruct())
+	{
+		UE_LOG(LogTemp, Error, TEXT("[GameMode] Keyword DataTable이 설정되지 않았습니다."));
+		return false;
+	}
+
+	const FProperty* KeywordProperty = nullptr;
+	for (TFieldIterator<FProperty> PropertyIt(KeywordDataTable->GetRowStruct()); PropertyIt; ++PropertyIt)
+	{
+		if (IsKeywordProperty(*PropertyIt))
+		{
+			KeywordProperty = *PropertyIt;
+			break;
+		}
+	}
+
+	if (!KeywordProperty)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[GameMode] DataTable Row에서 Keyword 필드를 찾지 못했습니다."));
+		return false;
+	}
+
+	TArray<FString> CandidateWords;
+	TSet<FString> UniqueWords;
+	for (const TPair<FName, uint8*>& RowPair : KeywordDataTable->GetRowMap())
+	{
+		FString Word = ReadKeywordValue(KeywordProperty, RowPair.Value).TrimStartAndEnd();
+		const FString ComparisonKey = Word.ToLower();
+		if (!Word.IsEmpty() && !UniqueWords.Contains(ComparisonKey))
+		{
+			UniqueWords.Add(ComparisonKey);
+			CandidateWords.Add(MoveTemp(Word));
+		}
+	}
+
+	if (CandidateWords.Num() < PlayerOrderList.Num())
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GameMode] 제시어가 부족합니다. 필요: %d, 유효 제시어: %d"),
+			PlayerOrderList.Num(), CandidateWords.Num());
+		return false;
+	}
+
+	for (int32 Index = CandidateWords.Num() - 1; Index > 0; --Index)
+	{
+		CandidateWords.Swap(Index, FMath::RandRange(0, Index));
+	}
+
+	for (int32 Index = 0; Index < PlayerOrderList.Num(); ++Index)
+	{
+		APlayerController* Player = PlayerOrderList[Index];
+		if (!IsValid(Player))
+		{
+			PlayerAssignedWords.Empty();
+			return false;
+		}
+
+		PlayerAssignedWords.Add(Player, CandidateWords[Index]);
+	}
+
+	return true;
 }
 
 void ASIGameMode::StartGameMatch()
 {
-	// 1. 모든 플레이어를 찢어서 각자의 방으로 보냅니다. (블루프린트 이벤트 호출)
-	SpawnPlayersToIndividualWorkspaces();
-
-	ASIGameState* SIGameState = GetGameState<ASIGameState>();
-	if (SIGameState)
+	ASIGameState* SIState = GetGameState<ASIGameState>();
+	if (!SIState || PlayerOrderList.IsEmpty())
 	{
-		SIGameState->CurrentGamePhase = ESIGamePhase::BuildPhase;
+		return;
 	}
 
-	// 2. 제작 시간 타이머 시작
-	GetWorldTimerManager().SetTimer(GameTimerHandle, this, &ASIGameMode::EndBuildPhase, BuildTimeLimit, false);
-	UE_LOG(LogTemp, Warning, TEXT("[Server] %f초 동안의 개인 제작 시간이 시작되었습니다."), BuildTimeLimit);
+	if (SIState->CurrentGamePhase == ESIGamePhase::BuildPhase
+		|| SIState->CurrentGamePhase == ESIGamePhase::GuessPhase)
+	{
+		return;
+	}
+
+	if (!AssignWordsToPlayers())
+	{
+		return;
+	}
+
+	SpawnPlayersToIndividualWorkspaces();
+
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		const FString* AssignedWord = PlayerAssignedWords.Find(Player);
+		if (AssignedWord)
+		{
+			if (ASIPlayerController* SIPlayer = Cast<ASIPlayerController>(Player))
+			{
+				SIPlayer->Client_ReceiveSecretWord(*AssignedWord);
+			}
+		}
+	}
+
+	CurrentWorkspaceIndex = -1;
+	CorrectPlayersThisTurn.Empty();
+	SIState->CurrentRound = 0;
+	SIState->TotalRounds = PlayerOrderList.Num();
+	SIState->SetCurrentWorkspaceOwner(nullptr);
+	SIState->SetRemainingTime(FMath::CeilToInt(BuildTimeLimit));
+	SIState->SetGamePhase(ESIGamePhase::BuildPhase);
+
+	GetWorldTimerManager().SetTimer(
+		GameTimerHandle, this, &ASIGameMode::EndBuildPhase, BuildTimeLimit, false);
+	GetWorldTimerManager().SetTimer(
+		UITimerTickHandle, this, &ASIGameMode::OnUITimerTick, 1.0f, true);
+}
+
+void ASIGameMode::OnUITimerTick()
+{
+	ASIGameState* SIState = GetGameState<ASIGameState>();
+	if (!SIState)
+	{
+		return;
+	}
+
+	const float TimerRemaining = GetWorldTimerManager().GetTimerRemaining(GameTimerHandle);
+	SIState->SetRemainingTime(FMath::Max(FMath::CeilToInt(TimerRemaining), 0));
 }
 
 void ASIGameMode::EndBuildPhase()
 {
-	// 제작이 끝나면 1번 플레이어(인덱스 0) 방부터 투어를 시작합니다.
 	CurrentWorkspaceIndex = 0;
 	StartNextGuessTurn();
 }
 
 void ASIGameMode::StartNextGuessTurn()
 {
-	// 모든 방을 다 돌았다면 게임 종료
 	if (!PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex))
 	{
 		EndMatch();
 		return;
 	}
 
-	ASIGameState* SIGameState = GetGameState<ASIGameState>();
-	if (SIGameState)
+	APlayerController* WorkspaceOwner = PlayerOrderList[CurrentWorkspaceIndex];
+	if (!IsValid(WorkspaceOwner) || !PlayerAssignedWords.Contains(WorkspaceOwner))
 	{
-		SIGameState->CurrentGamePhase = ESIGamePhase::GuessPhase;
-		SIGameState->CurrentPresenter = PlayerOrderList[CurrentWorkspaceIndex]->PlayerState;
+		++CurrentWorkspaceIndex;
+		StartNextGuessTurn();
+		return;
 	}
 
-	// 모든 플레이어를 이번 턴 주인의 방으로 강제 스폰시킵니다.
-	APlayerController* TargetOwner = PlayerOrderList[CurrentWorkspaceIndex];
-	SpawnPlayersToTargetWorkspace(TargetOwner);
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	{
+		SIState->CurrentRound = CurrentWorkspaceIndex + 1;
+		SIState->TotalRounds = PlayerOrderList.Num();
+		SIState->SetCurrentWorkspaceOwner(WorkspaceOwner->PlayerState);
+		SIState->SetRemainingTime(FMath::CeilToInt(GuessTimeLimit));
+		SIState->SetGamePhase(ESIGamePhase::GuessPhase);
+	}
 
-	// 임시 정답 세팅 (추후 데이터테이블 등과 연동)
-	CurrentCorrectAnswer = TEXT("사과");
-	CorrectCountThisTurn = 0;
+	SpawnPlayersToTargetWorkspace(WorkspaceOwner);
+	CorrectPlayersThisTurn.Empty();
 
-	// 정답 맞추기 시간 타이머 시작
-	GetWorldTimerManager().SetTimer(GameTimerHandle, this, &ASIGameMode::EndGuessTurn, GuessTimeLimit, false);
-	UE_LOG(LogTemp, Warning, TEXT("[Server] %d번 플레이어 방 투어 시작! (%f초)"), CurrentWorkspaceIndex + 1, GuessTimeLimit);
+	GetWorldTimerManager().SetTimer(
+		GameTimerHandle, this, &ASIGameMode::EndGuessTurn, GuessTimeLimit, false);
 }
 
 void ASIGameMode::EndGuessTurn()
 {
-	// 시간이 다 되면 무조건 다음 방으로 넘어갑니다.
-	CurrentWorkspaceIndex++;
+	++CurrentWorkspaceIndex;
 	StartNextGuessTurn();
 }
 
-void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString& SubmittedAnswer)
+void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Message)
 {
-	ASIGameState* SIGameState = GetGameState<ASIGameState>();
-
-	// 맞추기 단계가 아니면 무시
-	if (SIGameState && SIGameState->CurrentGamePhase != ESIGamePhase::GuessPhase) return;
-
-	// 출제자(방 주인) 본인은 정답 제출 금지
-	if (Submitter == PlayerOrderList[CurrentWorkspaceIndex]) return;
-
-	// 정답 판별 (대소문자 무시)
-	if (SubmittedAnswer.Equals(CurrentCorrectAnswer, ESearchCase::IgnoreCase))
+	ASIGameState* SIState = GetGameState<ASIGameState>();
+	if (!SIState || !IsValid(Sender) || !PlayerOrderList.Contains(Sender))
 	{
-		ASIPlayerState* SubmitterState = Submitter->GetPlayerState<ASIPlayerState>();
-		if (SubmitterState)
-		{
-			// 선착순 점수 차등 지급 (AddScore 사용해야 OnScoreUpdated 델리게이트가 발동됨)
-			int32 ScoreToEarn = FMath::Max(5 - CorrectCountThisTurn, 1);
-			SubmitterState->AddScore(ScoreToEarn);
+		return;
+	}
 
-			// 방 주인에게도 1점 보너스 지급
-			if (ASIPlayerState* PresenterState = Cast<ASIPlayerState>(SIGameState->CurrentPresenter))
-			{
-				PresenterState->AddScore(1);
-			}
+	FString NormalizedMessage = Message.TrimStartAndEnd();
+	if (NormalizedMessage.IsEmpty())
+	{
+		return;
+	}
+	NormalizedMessage.LeftInline(MaxChatLength);
 
-			CorrectCountThisTurn++;
-		}
+	if (SIState->CurrentGamePhase != ESIGamePhase::GuessPhase)
+	{
+		BroadcastChat(Sender, NormalizedMessage);
+		return;
+	}
+
+	if (!PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex))
+	{
+		return;
+	}
+
+	APlayerController* WorkspaceOwner = PlayerOrderList[CurrentWorkspaceIndex];
+	const FString* CorrectAnswer = PlayerAssignedWords.Find(WorkspaceOwner);
+	if (!IsValid(WorkspaceOwner) || !CorrectAnswer)
+	{
+		return;
+	}
+
+	const bool bMatchesAnswer = NormalizedMessage.Equals(*CorrectAnswer, ESearchCase::IgnoreCase);
+	if (!bMatchesAnswer)
+	{
+		BroadcastChat(Sender, NormalizedMessage);
+		return;
+	}
+
+	// 정답 텍스트는 제출 자격과 무관하게 절대 채팅으로 내보내지 않습니다.
+	if (Sender == WorkspaceOwner || CorrectPlayersThisTurn.Contains(Sender))
+	{
+		return;
+	}
+
+	ASIPlayerState* SenderState = Sender->GetPlayerState<ASIPlayerState>();
+	if (!SenderState)
+	{
+		return;
+	}
+
+	const int32 ScoreToEarn = FMath::Max(5 - CorrectPlayersThisTurn.Num(), 1);
+	SenderState->AddScore(ScoreToEarn);
+	CorrectPlayersThisTurn.Add(Sender);
+
+	FAnswerResultPayload Payload;
+	Payload.Submitter = SenderState;
+	Payload.SubmittedAnswer = TEXT("");
+	Payload.ScoreEarned = ScoreToEarn;
+	Payload.bIsCorrect = true;
+	SIState->Multicast_BroadcastAnswerResult(Payload);
+}
+
+void ASIGameMode::BroadcastChat(APlayerController* Sender, const FString& Message)
+{
+	if (!IsValid(Sender))
+	{
+		return;
+	}
+
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	{
+		FChatMessagePayload Payload;
+		Payload.Sender = Sender->PlayerState;
+		Payload.Message = Message;
+		SIState->Multicast_BroadcastChatMessage(Payload);
 	}
 }
 
 void ASIGameMode::EndMatch()
 {
-	ASIGameState* SIGameState = GetGameState<ASIGameState>();
-	if (SIGameState)
+	GetWorldTimerManager().ClearTimer(GameTimerHandle);
+	GetWorldTimerManager().ClearTimer(UITimerTickHandle);
+
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
 	{
-		SIGameState->CurrentGamePhase = ESIGamePhase::ResultPhase;
+		SIState->SetRemainingTime(0);
+		SIState->SetCurrentWorkspaceOwner(nullptr);
+		SIState->SetGamePhase(ESIGamePhase::ResultPhase);
+		SIState->Multicast_BroadcastMatchEnded();
 	}
 
-	// 5초 대기 후 로비 맵으로 강제 귀환
 	FTimerHandle ReturnTimerHandle;
 	GetWorldTimerManager().SetTimer(ReturnTimerHandle, [this]()
-		{
-			ProcessServerTravel(TEXT("/Game/Maps/LobbyMap?listen"));
-		}, 5.f, false);
-}
-
-void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Message)
-{
-	// TODO: 정답 판정 (은석님)
-    
-	ASIGameState* GS = GetGameState<ASIGameState>();
-	if (!GS || !Sender) return;
-    
-	FChatMessagePayload Payload;
-	Payload.Sender = Sender->PlayerState;
-	Payload.Message = Message;
-	GS->Multicast_BroadcastChatMessage(Payload);
+	{
+		ProcessServerTravel(TEXT("/Game/Shape_It/Level/Test_Lobby?listen"));
+	}, 5.0f, false);
 }
