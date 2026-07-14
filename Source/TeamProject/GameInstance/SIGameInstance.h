@@ -17,4 +17,13 @@ class TEAMPROJECT_API USIGameInstance : public UGameInstance
 public:
 	void CreateRoom();   // 지금은 내부에서 OpenLevel(...,"listen") 호출
 	void JoinRoom(const FString& Address); // 지금은 내부에서 OpenLevel(Address) 호출
+
+	// 서버의 GameInstance에만 보관되며 레벨 이동 후 Main GameMode가 자동 시작에 사용합니다.
+	void PreparePendingMatch(int32 InExpectedPlayerCount);
+	bool IsPendingMatchReady(int32 ConnectedPlayerCount) const;
+	void ConsumePendingMatch();
+
+private:
+	bool bPendingMatchStart = false;
+	int32 ExpectedPlayerCount = 0;
 };

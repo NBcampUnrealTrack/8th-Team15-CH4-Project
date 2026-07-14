@@ -63,6 +63,7 @@ private:
 	int32 CurrentWorkspaceIndex = -1;
 
 	bool AssignWordsToPlayers();
+	void TryStartPendingMatch();
 	void OnUITimerTick();
 	void BroadcastChat(APlayerController* Sender, const FString& Message);
 

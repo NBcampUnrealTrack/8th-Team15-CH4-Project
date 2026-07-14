@@ -1,6 +1,7 @@
 #include "SIGameMode.h"
 
 #include "Engine/DataTable.h"
+#include "GameInstance/SIGameInstance.h"
 #include "GameFramework/PlayerState.h"
 #include "GameState/SIGameState.h"
 #include "PlayerController/SIPlayerController.h"
@@ -79,6 +80,21 @@ void ASIGameMode::PostLogin(APlayerController* NewPlayer)
 			SIState->Multicast_BroadcastPlayerJoined(PlayerState);
 		}
 	}
+
+	TryStartPendingMatch();
+}
+
+void ASIGameMode::TryStartPendingMatch()
+{
+	USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>();
+	if (!SIInstance || !SIInstance->IsPendingMatchReady(PlayerOrderList.Num()))
+	{
+		return;
+	}
+
+	// 같은 프레임에 여러 PostLogin이 들어와도 시작 예약은 한 번만 만듭니다.
+	SIInstance->ConsumePendingMatch();
+	GetWorldTimerManager().SetTimerForNextTick(this, &ASIGameMode::StartGameMatch);
 }
 
 void ASIGameMode::Logout(AController* Exiting)
@@ -396,6 +412,7 @@ void ASIGameMode::EndMatch()
 	FTimerHandle ReturnTimerHandle;
 	GetWorldTimerManager().SetTimer(ReturnTimerHandle, [this]()
 	{
-		ProcessServerTravel(TEXT("/Game/Shape_It/Level/Test_Lobby?listen"));
+		ProcessServerTravel(
+			TEXT("/Game/Shape_It/Level/Test_Lobby?listen?game=/Script/TeamProject.SILobbyGameMode"));
 	}, 5.0f, false);
 }

@@ -11,11 +11,28 @@ void USIGameInstance::CreateRoom()
 		this,
 		FName("/Game/Shape_It/Level/Test_Lobby"),
 		true,
-		TEXT("listen")
+		TEXT("listen?game=/Script/TeamProject.SILobbyGameMode")
 	);
 }
 
 void USIGameInstance::JoinRoom(const FString& Address)
 {
 	UGameplayStatics::OpenLevel(this, FName(*Address), false);
+}
+
+void USIGameInstance::PreparePendingMatch(const int32 InExpectedPlayerCount)
+{
+	ExpectedPlayerCount = FMath::Max(InExpectedPlayerCount, 1);
+	bPendingMatchStart = true;
+}
+
+bool USIGameInstance::IsPendingMatchReady(const int32 ConnectedPlayerCount) const
+{
+	return bPendingMatchStart && ConnectedPlayerCount >= ExpectedPlayerCount;
+}
+
+void USIGameInstance::ConsumePendingMatch()
+{
+	bPendingMatchStart = false;
+	ExpectedPlayerCount = 0;
 }

@@ -344,8 +344,6 @@ void ASIPlayerController::TryCacheGameState()
 void ASIPlayerController::StartRoomCreation()
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
-
-	OpenLobbySettingWidget();
 }
 
 void ASIPlayerController::OpenLobbySettingWidget()

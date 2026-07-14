@@ -1,5 +1,6 @@
 ﻿#include "SIPlayerState.h"
 #include "Gamemode/SIGameMode.h" // GameMode의 StartGameMatch를 호출하기 위해 포함
+#include "Gamemode/SILobbyGameMode.h"
 #include "Net/UnrealNetwork.h"
 
 ASIPlayerState::ASIPlayerState()
@@ -56,7 +57,15 @@ void ASIPlayerState::Server_RequestStartGame_Implementation()
 		return;
 	}
 
-	// 서버에만 유일하게 존재하는 매치 심판(GameMode)을 가져옵니다.
+	// 로비에서는 매치를 바로 시작하지 않고 모든 플레이어를 MainLevel로 이동시킵니다.
+	if (ASILobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<ASILobbyGameMode>())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Server] MainLevel로 이동합니다."));
+		LobbyGameMode->RequestStartGame(this);
+		return;
+	}
+
+	// MainLevel을 직접 실행해 테스트할 때 사용할 기존 경로입니다.
 	if (ASIGameMode* GameMode = GetWorld()->GetAuthGameMode<ASIGameMode>())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[Server] 호스트의 정상적인 요청으로 게임을 시작합니다."));
