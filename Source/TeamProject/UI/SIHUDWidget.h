@@ -93,6 +93,9 @@ private:
 	void HandleChatMessage(const FChatMessagePayload& Payload);
 	
 	UFUNCTION()
+	void HandleAnswerResult(const FAnswerResultPayload& Payload);
+	
+	UFUNCTION()
 	void HandleScoreUpdated(int32 NewScore);
 	
 	UFUNCTION()

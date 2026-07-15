@@ -181,6 +181,14 @@ void USIHUDWidget::HandleChatMessage(const FChatMessagePayload& Payload)
 	ScrollBox_ChatLog->ScrollToEnd();
 }
 
+void USIHUDWidget::HandleAnswerResult(const FAnswerResultPayload& Payload)
+{
+	if (CachedPlayerState.IsValid() && Payload.Submitter == CachedPlayerState.Get())
+	{
+		ShowResult(Payload.bIsCorrect);
+	}
+}
+
 void USIHUDWidget::HandleScoreUpdated(int32 NewScore)
 {
 	if (!IsValid(Text_Score))
