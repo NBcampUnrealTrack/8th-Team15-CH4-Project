@@ -6,9 +6,7 @@
 #include "UObject/ConstructorHelpers.h"
 
 ASILobbyGameMode::ASILobbyGameMode()
-{
-	bUseSeamlessTravel = true;
-	
+{		
 	static ConstructorHelpers::FClassFinder<AGameStateBase> GameStateFinder(
 		TEXT("/Game/Shape_It/Game/BP_GameState"));
 	if (GameStateFinder.Succeeded())
@@ -128,6 +126,13 @@ void ASILobbyGameMode::RequestStartGame(ASIPlayerState* RequestingPlayerState)
 	SIInstance->PreparePendingMatch(SIState->PlayerArray.Num());
 	SIState->Mulitcast_GameStartSound();
 
-	GetWorld()->ServerTravel(
-		TEXT("/Game/Shape_It/Level/MainLevel?listen?game=/Game/Shape_It/Game/BP_GameMode.BP_GameMode_C"));
+	FTimerHandle TravelTimerHandle;
+	float StartDelay = 3.0f;
+
+	GetWorldTimerManager().SetTimer(TravelTimerHandle, [this, SIState]()
+		{
+			GetWorld()->ServerTravel(
+				TEXT("/Game/Shape_It/Level/MainLevel?listen?game=/Game/Shape_It/Game/BP_GameMode.BP_GameMode_C"));
+		}, StartDelay, false);
 }
+
