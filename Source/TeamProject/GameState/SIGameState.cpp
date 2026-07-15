@@ -1,5 +1,6 @@
-#include "SIGameState.h"
 
+#include "SIGameState.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 ASIGameState::ASIGameState()
@@ -64,6 +65,8 @@ void ASIGameState::SetCurrentWorkspaceOwner(APlayerState* NewWorkspaceOwner)
 	ForceNetUpdate();
 }
 
+
+
 void ASIGameState::OnRep_GamePhase()
 {
 	OnPhaseChanged.Broadcast(CurrentGamePhase);
@@ -103,3 +106,31 @@ void ASIGameState::Multicast_BroadcastPlayerLeft_Implementation(APlayerState* Le
 {
 	OnPlayerLeft.Broadcast(LeftPlayer);
 }
+
+#pragma region Sound 
+
+void ASIGameState::Mulitcast_GameStartSound_Implementation()
+{
+	if (GameStartSound)
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), GameStartSound);
+	}
+}
+
+void ASIGameState::Multicast_PlayerCorrectAnswerSound_Implementation(AActor* CorrectPlayer)
+{
+	if (!CorrectPlayer || !CorrectAnswerSound) return;
+	
+	UGameplayStatics::SpawnSoundAttached
+	(
+	CorrectAnswerSound,
+	CorrectPlayer->GetRootComponent(),
+	NAME_None,
+	FVector::ZeroVector,
+	EAttachLocation::KeepRelativeOffset,
+	false,
+	1.0f, 1.0f, 0.0f,
+	CorrectAttenuation
+	);
+}
+#pragma endregion

@@ -7,6 +7,8 @@
 
 ASILobbyGameMode::ASILobbyGameMode()
 {
+	bUseSeamlessTravel = true;
+	
 	static ConstructorHelpers::FClassFinder<AGameStateBase> GameStateFinder(
 		TEXT("/Game/Shape_It/Game/BP_GameState"));
 	if (GameStateFinder.Succeeded())
@@ -119,6 +121,7 @@ void ASILobbyGameMode::RequestStartGame(ASIPlayerState* RequestingPlayerState)
 
 	bTravelRequested = true;
 	SIInstance->PreparePendingMatch(SIState->PlayerArray.Num());
+	SIState->Mulitcast_GameStartSound();
 
 	GetWorld()->ServerTravel(
 		TEXT("/Game/Shape_It/Level/MainLevel?listen?game=/Game/Shape_It/Game/BP_GameMode.BP_GameMode_C"));

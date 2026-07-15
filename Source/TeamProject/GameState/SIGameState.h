@@ -15,6 +15,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChatMessageSignature, const FChat
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoinedSignature, class APlayerState*, JoinedPlayer);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeftSignature, class APlayerState*, LeftPlayer);
 
+class USoundBase;
+
 UCLASS()
 class TEAMPROJECT_API ASIGameState : public AGameState
 {
@@ -92,4 +94,24 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_BroadcastPlayerLeft(APlayerState* LeftPlayer);
+	
+#pragma region Sound
+	
+	UFUNCTION(NetMulticast, Reliable)
+	void Mulitcast_GameStartSound();
+	
+	//파라미터로 AActor 받는 이유는 실제 월드상에 존재하는 액터의 위치를 받기 위해서 참조합니다.
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayerCorrectAnswerSound(AActor* CorrectPlayer);
+	
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> GameStartSound;
+	
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> CorrectAnswerSound;
+	
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundAttenuation> CorrectAttenuation;
+
+#pragma endregion
 };
