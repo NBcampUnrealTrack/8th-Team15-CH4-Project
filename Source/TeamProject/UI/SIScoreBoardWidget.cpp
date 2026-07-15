@@ -2,6 +2,8 @@
 
 #include "UI/SIScoreBoardWidget.h"
 #include "GameState/SIGameState.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
 #include "PlayerState/SIPlayerState.h"
 
 void USIScoreBoardWidget::NativeConstruct()
@@ -19,13 +21,8 @@ void USIScoreBoardWidget::NativeConstruct()
 
 	GS->OnPlayerJoined.AddDynamic(this, &USIScoreBoardWidget::HandlePlayerJoined);
 	GS->OnPlayerLeft.AddDynamic(this, &USIScoreBoardWidget::HandlePlayerLeft);
+	GS->OnScoreboardUpdated.AddDynamic(this, &USIScoreBoardWidget::HandleScoreboardUpdated);
 	GS->OnMatchEnded.AddDynamic(this, &USIScoreBoardWidget::HandleMatchEnded);
-
-	// 이미 접속해 있는 플레이어들의 OnScoreUpdated에 바인딩
-	for (APlayerState* PS : GS->PlayerArray)
-	{
-		BindPlayerScoreDelegate(PS);
-	}
 
 	RefreshSortedPlayers();
 }
@@ -36,31 +33,80 @@ void USIScoreBoardWidget::NativeDestruct()
 	{
 		CachedGameState->OnPlayerJoined.RemoveDynamic(this, &USIScoreBoardWidget::HandlePlayerJoined);
 		CachedGameState->OnPlayerLeft.RemoveDynamic(this, &USIScoreBoardWidget::HandlePlayerLeft);
+		CachedGameState->OnScoreboardUpdated.RemoveDynamic(this, &USIScoreBoardWidget::HandleScoreboardUpdated);
 		CachedGameState->OnMatchEnded.RemoveDynamic(this, &USIScoreBoardWidget::HandleMatchEnded);
-
-		for (APlayerState* PS : CachedGameState->PlayerArray)
-		{
-			UnbindPlayerScoreDelegate(PS);
-		}
 	}
 
 	Super::NativeDestruct();
 }
 
-void USIScoreBoardWidget::HandleAnyScoreChanged(int32 NewScore)
+void USIScoreBoardWidget::DrawScoreBoard()
+{
+	if (!VerticalBox_Rankings)
+	{
+		return;
+	}
+	
+	const int32 SlotCount = VerticalBox_Rankings->GetChildrenCount();
+	
+	int32 DisplayRank = 1;
+	
+	for (int32 i = 0; i < SlotCount; ++i)
+	{
+		UTextBlock* RawText = Cast<UTextBlock>(VerticalBox_Rankings->GetChildAt(i));
+		if (!RawText)
+		{
+			continue;
+		}
+
+		if (i < SortedPlayers.Num())
+		{
+			const FString PlayerName = SortedPlayers[i]->GetPlayerName();
+			
+			ASIPlayerState* PS = Cast<ASIPlayerState>(SortedPlayers[i]);
+			
+			if (!IsValid(PS))
+			{
+				continue;
+			}
+			
+			const int32 PlayerScore = PS->CurrentScore;
+			
+			if (i > 0)
+			{
+				ASIPlayerState* PrevPS = Cast<ASIPlayerState>(SortedPlayers[i - 1]);
+				const int32 PrevScore = PrevPS ? PrevPS->CurrentScore : 0;
+
+				if (PlayerScore != PrevScore)   // 앞 사람과 점수가 다르면
+				{
+					DisplayRank = i + 1;        // 등수를 현재 위치로 갱신
+				}
+				// 점수가 같으면 DisplayRank 그대로 유지 → 공동순위
+			}
+			
+			const FString Line = FString::Printf(TEXT("%d. %s : %d"), DisplayRank, *PlayerName, PlayerScore);
+			RawText->SetText(FText::FromString(Line));
+			RawText->SetVisibility(ESlateVisibility::Visible);
+		}
+		else
+		{
+			RawText->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+}
+
+void USIScoreBoardWidget::HandleScoreboardUpdated()
 {
 	RefreshSortedPlayers();
 }
 
 void USIScoreBoardWidget::HandlePlayerJoined(APlayerState* JoinedPlayer)
 {
-	BindPlayerScoreDelegate(JoinedPlayer);
 	RefreshSortedPlayers();
 }
 
 void USIScoreBoardWidget::HandlePlayerLeft(APlayerState* LeftPlayer)
 {
-	UnbindPlayerScoreDelegate(LeftPlayer);
 	RefreshSortedPlayers();
 }
 
@@ -96,21 +142,6 @@ void USIScoreBoardWidget::RefreshSortedPlayers()
 		return ScoreA > ScoreB;
 	});
 
-	OnScoreBoardRefreshed();
+	DrawScoreBoard();
 }
 
-void USIScoreBoardWidget::BindPlayerScoreDelegate(APlayerState* PS)
-{
-	if (ASIPlayerState* SIPS = Cast<ASIPlayerState>(PS))
-	{
-		SIPS->OnScoreUpdated.AddDynamic(this, &USIScoreBoardWidget::HandleAnyScoreChanged);
-	}
-}
-
-void USIScoreBoardWidget::UnbindPlayerScoreDelegate(APlayerState* PS)
-{
-	if (ASIPlayerState* SIPS = Cast<ASIPlayerState>(PS))
-	{
-		SIPS->OnScoreUpdated.RemoveDynamic(this, &USIScoreBoardWidget::HandleAnyScoreChanged);
-	}
-}

@@ -25,22 +25,23 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "ScoreBoard")
 	bool bMatchEnded = false;
 
-	// 스코어 리스트가 갱신될 때 BP에서 UI를 다시 그리도록 오버라이드
-	UFUNCTION(BlueprintImplementableEvent, Category = "ScoreBoard")
-	void OnScoreBoardRefreshed();
-
 	// 매치 종료 시 최종 순위 발표용
 	UFUNCTION(BlueprintImplementableEvent, Category = "ScoreBoard")
 	void OnFinalRankingReady();
 
+private:
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<class UVerticalBox> VerticalBox_Rankings;
+	
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 private:
-	// 어떤 PlayerState의 스코어가 바뀌든 전체 순회 리프레시
+	void DrawScoreBoard();
+	
 	UFUNCTION()
-	void HandleAnyScoreChanged(int32 NewScore);
+	void HandleScoreboardUpdated();
 
 	UFUNCTION()
 	void HandlePlayerJoined(APlayerState* JoinedPlayer);
@@ -54,9 +55,7 @@ private:
 	// 현재 PlayerArray를 스코어 내림차순으로 정렬해 SortedPlayers 갱신
 	void RefreshSortedPlayers();
 
-	// 개별 PlayerState의 OnScoreUpdated에 바인딩
-	void BindPlayerScoreDelegate(APlayerState* PS);
-	void UnbindPlayerScoreDelegate(APlayerState* PS);
+
 
 	TWeakObjectPtr<ASIGameState> CachedGameState;
 };

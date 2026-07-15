@@ -65,6 +65,10 @@ void ASIGameState::SetCurrentWorkspaceOwner(APlayerState* NewWorkspaceOwner)
 	ForceNetUpdate();
 }
 
+void ASIGameState::Multicast_BroadcastScoreboardUpdated_Implementation()
+{
+	OnScoreboardUpdated.Broadcast();
+}
 
 
 void ASIGameState::OnRep_GamePhase()

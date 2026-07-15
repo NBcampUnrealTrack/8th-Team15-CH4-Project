@@ -7,6 +7,7 @@
 // UI 블루프린트에 점수 변경을 즉각적으로 알려줄 델리게이트 선언
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnScoreUpdatedSignature, int32, NewScore);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHostStatusChanged, bool, bIsHost);
+
 /**
  * 플레이어 개인의 점수 및 로비 상태를 관리하고 클라이언트 UI와 동기화하는 클래스입니다.
  */

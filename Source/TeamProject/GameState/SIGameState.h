@@ -11,9 +11,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWorkspaceOwnerChangedSignature, c
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAnswerResultSignature, const FAnswerResultPayload&, Payload);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMatchEndedSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnScoreboardUpdatedSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChatMessageSignature, const FChatMessagePayload&, Payload);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoinedSignature, class APlayerState*, JoinedPlayer);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeftSignature, class APlayerState*, LeftPlayer);
+
 
 class USoundBase;
 
@@ -70,6 +72,12 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_BroadcastAnswerResult(const FAnswerResultPayload& Payload);
+	
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnScoreboardUpdatedSignature OnScoreboardUpdated;
+	
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_BroadcastScoreboardUpdated();
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnMatchEndedSignature OnMatchEnded;

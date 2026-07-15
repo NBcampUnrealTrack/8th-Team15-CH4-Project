@@ -1,6 +1,7 @@
 ﻿#include "SIPlayerState.h"
 #include "Gamemode/SIGameMode.h" // GameMode의 StartGameMatch를 호출하기 위해 포함
 #include "Gamemode/SILobbyGameMode.h"
+#include "GameState/SIGameState.h"
 #include "Net/UnrealNetwork.h"
 
 ASIPlayerState::ASIPlayerState()
@@ -32,6 +33,11 @@ void ASIPlayerState::AddScore(int32 Amount)
 
 		// 호스트(서버 본인)의 화면 UI도 즉시 업데이트하기 위해 수동으로 한 번 호출
 		OnRep_CurrentScore();
+		
+		if (ASIGameState* GS = GetWorld()->GetGameState<ASIGameState>())
+		{
+			GS->Multicast_BroadcastScoreboardUpdated();
+		}
 	}
 }
 
