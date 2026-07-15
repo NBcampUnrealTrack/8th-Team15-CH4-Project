@@ -108,6 +108,19 @@ private:
 	virtual void ReceivedPlayer() override;
 
 	virtual void SetupInputComponent() override;
+
+public:
+	// Enter 입력 시 채팅창에 포커스를 주고 GameAndUI 입력 모드로 전환한다.
+	void FocusChat();
+
+	// 채팅 전송/취소 후 다시 GameOnly 입력 모드로 복귀한다. (HUD가 커밋 시 호출)
+	void EndChatFocus();
+
+private:
+	// 현재 채팅 입력 모드인지 (Enter 중복 처리 방지)
+	bool bChatFocused = false;
+
+private:
 	
 	UFUNCTION()
 	void HandlePhaseChanged(ESIGamePhase NewPhase);

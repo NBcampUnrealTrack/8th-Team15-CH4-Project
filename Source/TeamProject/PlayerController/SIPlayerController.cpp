@@ -12,6 +12,8 @@
 #include "UI/SIScoreBoardWidget.h"
 
 #include "EnhancedInputComponent.h"
+#include "InputCoreTypes.h"
+#include "TimerManager.h"
 #include "Engine/GameViewportClient.h"
 #include "GameInstance/SIGameInstance.h"
 #include "Kismet/GameplayStatics.h"
@@ -174,13 +176,73 @@ void ASIPlayerController::ReceivedPlayer()
 			GameViewportClient->SetMouseLockMode(EMouseLockMode::LockAlways);
 		}
 	}
-	
+
+}
+
+void ASIPlayerController::FocusChat()
+{
+	// 이미 채팅 중이거나 HUD가 없으면 무시
+	if (bChatFocused || !IsValid(HUDWidget))
+	{
+		return;
+	}
+
+	bChatFocused = true;
+
+	// UI가 키보드 입력을 받을 수 있도록 GameAndUI로 전환 + 커서 표시
+	bShowMouseCursor = true;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+
+	if (UGameViewportClient* GameViewportClient = GetWorld()->GetGameViewport())
+	{
+		GameViewportClient->SetMouseCaptureMode(EMouseCaptureMode::CaptureDuringMouseDown);
+		GameViewportClient->SetMouseLockMode(EMouseLockMode::DoNotLock);
+	}
+
+	// 이번 Enter 입력이 소진된 다음 프레임에 포커스를 줘서, 열자마자 빈 커밋으로 닫히는 걸 방지
+	GetWorld()->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (bChatFocused && IsValid(HUDWidget))
+			{
+				HUDWidget->FocusChatInput();
+			}
+		}));
+}
+
+void ASIPlayerController::EndChatFocus()
+{
+	if (!bChatFocused)
+	{
+		return;
+	}
+
+	bChatFocused = false;
+
+	// 다시 게임 전용 입력으로 복귀
+	bShowMouseCursor = false;
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+
+	if (UGameViewportClient* GameViewportClient = GetWorld()->GetGameViewport())
+	{
+		GameViewportClient->SetMouseCaptureMode(EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown);
+		GameViewportClient->SetMouseLockMode(EMouseLockMode::LockAlways);
+	}
 }
 
 void ASIPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	
+	// 채팅 열기: Enter 키를 직접 바인딩(별도 IA 애셋 불필요).
+	// GameOnly 모드에서 Enter가 게임 입력으로 들어올 때 채팅창 포커스로 전환한다.
+	// (채팅창이 포커스된 동안엔 Enter를 Slate(EditableText)가 먹으므로 여기로 안 옴)
+	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ASIPlayerController::FocusChat);
+
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 
 	if (!EnhancedInputComponent)

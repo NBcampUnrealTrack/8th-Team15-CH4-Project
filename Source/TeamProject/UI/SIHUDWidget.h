@@ -42,6 +42,9 @@ public:
 	
 	UFUNCTION()
 	void SetSecretWord(const FString& NewSecretWord);
+
+	// 채팅 입력창에 키보드 포커스를 준다 (PlayerController가 채팅 열 때 호출)
+	void FocusChatInput();
 	
 private:	
 	UPROPERTY(meta = (BindWidget))
@@ -59,7 +62,8 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UEditableText> EditableText_ChatInput;
 	
-	UPROPERTY(meta = (AllowPrivateAccess = "true"))
+	// 채팅 한 줄을 그릴 위젯 클래스. WBP_HUD 디테일에서 WBP_ChatLine을 지정해야 채팅이 표시됨.
+	UPROPERTY(EditDefaultsOnly, Category = "HUD|Chat", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USIChatLineWidget> ChatLineWidgetClass;
 	
 	UPROPERTY(meta = (BindWidget))
@@ -80,6 +84,12 @@ protected:
 	virtual void NativeDestruct() override;
 
 private:
+	// GameState/PlayerState가 준비될 때까지 재시도하며 델리게이트를 배선한다.
+	void BindGameData();
+
+	// GS/PS 확보 재시도 타이머
+	FTimerHandle DataBindRetryTimer;
+
 	void ShowResult(bool bCorrect);
 	void HideResult();
 	

@@ -26,42 +26,54 @@ void USIHUDWidget::NativeConstruct()
 		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	TObjectPtr<ASIGameState> GS = GetWorld()->GetGameState<ASIGameState>();
-	if (!IsValid(GS))
-	{
-		return;
-	}
-	
-	CachedGameState = GS;
-	
-	GS->OnPhaseChanged.AddDynamic(this, &USIHUDWidget::HandlePhaseChanged);
-	GS->OnTimeUpdated.AddDynamic(this, &USIHUDWidget::HandleTimeUpdated);
-	GS->OnChatMessage.AddDynamic(this, &USIHUDWidget::HandleChatMessage);
-	GS->OnAnswerResult.AddDynamic(this, &USIHUDWidget::HandleAnswerResult);
-	
-	ASIPlayerState* PS = GetOwningPlayerState<ASIPlayerState>();
-	if (!IsValid(PS))
-	{
-		return;
-	}
-	
-	CachedPlayerState = PS;
-	PS->OnScoreUpdated.AddDynamic(this, &USIHUDWidget::HandleScoreUpdated);
-	
-	// 초기 상태 즉시 반영 (이미 진행 중인 게임에 접속하는 케이스)
-	HandlePhaseChanged(GS->CurrentGamePhase);
-	HandleTimeUpdated(GS->RemainingTime);
-	HandleScoreUpdated(PS->CurrentScore);
-	
+	// 위젯 존재만 필요한 입력 바인딩: GS/PS 확보 여부와 무관하게 항상 실행.
+	// (이전엔 PS early-return 뒤에 있어서 PS 복제가 늦으면 채팅 Enter가 영영 안 붙었음)
 	if (IsValid(EditableText_ChatInput))
 	{
 		EditableText_ChatInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleChatCommitted);
 	}
-	
+
 	if (IsValid(EditableText_AnswerInput))
 	{
 		EditableText_AnswerInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
 	}
+
+	// GameState/PlayerState 의존 배선은 준비될 때까지 재시도
+	BindGameData();
+}
+
+void USIHUDWidget::BindGameData()
+{
+	UWorld* World = GetWorld();
+	ASIGameState* GS = World ? World->GetGameState<ASIGameState>() : nullptr;
+	ASIPlayerState* PS = GetOwningPlayerState<ASIPlayerState>();
+
+	if (!IsValid(GS) || !IsValid(PS))
+	{
+		// 아직 복제 안 됨 → 잠시 후 재시도 (위젯이 GS/PS보다 먼저 생성되는 케이스 대비)
+		if (World)
+		{
+			World->GetTimerManager().SetTimer(
+				DataBindRetryTimer, this, &USIHUDWidget::BindGameData, 0.1f, false);
+		}
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(DataBindRetryTimer);
+
+	CachedGameState = GS;
+	GS->OnPhaseChanged.AddDynamic(this, &USIHUDWidget::HandlePhaseChanged);
+	GS->OnTimeUpdated.AddDynamic(this, &USIHUDWidget::HandleTimeUpdated);
+	GS->OnChatMessage.AddDynamic(this, &USIHUDWidget::HandleChatMessage);
+	GS->OnAnswerResult.AddDynamic(this, &USIHUDWidget::HandleAnswerResult);
+
+	CachedPlayerState = PS;
+	PS->OnScoreUpdated.AddDynamic(this, &USIHUDWidget::HandleScoreUpdated);
+
+	// 초기 상태 즉시 반영 (이미 진행 중인 게임에 접속하는 케이스)
+	HandlePhaseChanged(GS->CurrentGamePhase);
+	HandleTimeUpdated(GS->RemainingTime);
+	HandleScoreUpdated(PS->CurrentScore);
 }
 
 void USIHUDWidget::NativeDestruct()
@@ -89,8 +101,12 @@ void USIHUDWidget::NativeDestruct()
 		EditableText_AnswerInput->OnTextCommitted.RemoveDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
 	}
 	
-	GetWorld()->GetTimerManager().ClearTimer(ResultHideTimerHandle);
-	
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ResultHideTimerHandle);
+		World->GetTimerManager().ClearTimer(DataBindRetryTimer);
+	}
+
 	Super::NativeDestruct();
 }
 
@@ -181,8 +197,19 @@ void USIHUDWidget::HandleTimeUpdated(int32 NewTime)
 	Text_Timer->SetText(FText::Format(INVTEXT("남은 시간 - {0}"),NewTime));
 }
 
+void USIHUDWidget::FocusChatInput()
+{
+	if (IsValid(EditableText_ChatInput))
+	{
+		EditableText_ChatInput->SetKeyboardFocus();
+	}
+}
+
 void USIHUDWidget::HandleChatMessage(const FChatMessagePayload& Payload)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[DEBUG][Chat] HandleChatMessage 수신: ScrollBox=%d, ChatLineClass=%d, Msg='%s'"),
+		IsValid(ScrollBox_ChatLog), (ChatLineWidgetClass != nullptr), *Payload.Message);
+
 	if (!IsValid(ScrollBox_ChatLog) || !ChatLineWidgetClass)
 	{
 		return;
@@ -217,17 +244,27 @@ void USIHUDWidget::HandleScoreUpdated(int32 NewScore)
 
 void USIHUDWidget::HandleChatCommitted(const FText& Chat, ETextCommit::Type CommitMethod)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[DEBUG][Chat] HandleChatCommitted 진입: CommitMethod=%d, Text='%s'"),
+		(int32)CommitMethod, *Chat.ToString());
+
 	if (CommitMethod != ETextCommit::OnEnter) return;
     
+	ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>();
 	FString Message = Chat.ToString().TrimStartAndEnd();
-	if (Message.IsEmpty()) return;
     
-	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
+	if (!Message.IsEmpty() && IsValid(PC))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[DEBUG][Chat] Server_SendChat 호출: '%s'"), *Message);
 		PC->Server_SendChat(Message);
 	}
     
 	EditableText_ChatInput->SetText(FText::GetEmpty());
+
+	// 채팅 입력 종료 → 게임 입력 모드로 복귀 (빈 메시지로 Enter 쳐도 닫힘)
+	if (IsValid(PC))
+	{
+		PC->EndChatFocus();
+	}
 }
 
 void USIHUDWidget::HandleAnswerCommitted(const FText& Answer, ETextCommit::Type CommitMethod)
