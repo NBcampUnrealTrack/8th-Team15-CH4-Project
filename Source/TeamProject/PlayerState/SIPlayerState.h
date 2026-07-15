@@ -6,7 +6,7 @@
 
 // UI 블루프린트에 점수 변경을 즉각적으로 알려줄 델리게이트 선언
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnScoreUpdatedSignature, int32, NewScore);
-
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHostStatusChanged, bool, bIsHost);
 /**
  * 플레이어 개인의 점수 및 로비 상태를 관리하고 클라이언트 UI와 동기화하는 클래스입니다.
  */
@@ -45,9 +45,17 @@ public:
 	// ==========================================
 
 	// 이 플레이어가 방장(호스트)인지 여부 
-	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Lobby")
+	UPROPERTY(ReplicatedUsing = OnRep_IsHost, BlueprintReadWrite, Category = "Lobby")
 	bool bIsHost;
-
+	
+	UFUNCTION()
+	void OnRep_IsHost();
+	
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnHostStatusChanged OnHostStatusChanged;
+	
+	void SetIsHost(bool bNewIsHost);
+	
 	// 호스트 UI에서 '게임 시작' 버튼을 눌렀을 때 서버에 게임 루프 시작을 요청하는 RPC 함수
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Lobby")
 	void Server_RequestStartGame();

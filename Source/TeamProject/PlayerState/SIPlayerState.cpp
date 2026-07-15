@@ -35,6 +35,18 @@ void ASIPlayerState::AddScore(int32 Amount)
 	}
 }
 
+void ASIPlayerState::OnRep_IsHost()
+{
+	OnHostStatusChanged.Broadcast(bIsHost);
+}
+
+void ASIPlayerState::SetIsHost(bool bNewIsHost)
+{
+	bIsHost = bNewIsHost;
+	OnRep_IsHost();
+	ForceNetUpdate(); 
+}
+
 void ASIPlayerState::OnRep_CurrentScore()
 {
 	// 점수가 바뀔 때마다 UI 블루프린트에 이벤트를 날림

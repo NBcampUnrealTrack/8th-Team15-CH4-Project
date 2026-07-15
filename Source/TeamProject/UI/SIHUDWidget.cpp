@@ -13,7 +13,19 @@
 void USIHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	
+
+	// 정답/오답 패널은 초기엔 무조건 숨김.
+	// GS/PS 확보 실패로 아래에서 early-return 되더라도 이 초기화는 반드시 실행되도록 맨 위로 올림.
+	if (IsValid(VerticalBox_CorrectAnswer))
+	{
+		VerticalBox_CorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (IsValid(VerticalBox_InCorrectAnswer))
+	{
+		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
 	TObjectPtr<ASIGameState> GS = GetWorld()->GetGameState<ASIGameState>();
 	if (!IsValid(GS))
 	{
@@ -25,6 +37,7 @@ void USIHUDWidget::NativeConstruct()
 	GS->OnPhaseChanged.AddDynamic(this, &USIHUDWidget::HandlePhaseChanged);
 	GS->OnTimeUpdated.AddDynamic(this, &USIHUDWidget::HandleTimeUpdated);
 	GS->OnChatMessage.AddDynamic(this, &USIHUDWidget::HandleChatMessage);
+	GS->OnAnswerResult.AddDynamic(this, &USIHUDWidget::HandleAnswerResult);
 	
 	ASIPlayerState* PS = GetOwningPlayerState<ASIPlayerState>();
 	if (!IsValid(PS))
@@ -49,16 +62,6 @@ void USIHUDWidget::NativeConstruct()
 	{
 		EditableText_AnswerInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
 	}
-	
-	if (IsValid(VerticalBox_CorrectAnswer))
-	{
-		VerticalBox_CorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
-	}
-	
-	if (IsValid(VerticalBox_InCorrectAnswer))
-	{
-		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Collapsed);
-	}
 }
 
 void USIHUDWidget::NativeDestruct()
@@ -68,6 +71,7 @@ void USIHUDWidget::NativeDestruct()
 		CachedGameState->OnPhaseChanged.RemoveDynamic(this, &USIHUDWidget::HandlePhaseChanged);
 		CachedGameState->OnTimeUpdated.RemoveDynamic(this, &USIHUDWidget::HandleTimeUpdated);
 		CachedGameState->OnChatMessage.RemoveDynamic(this, &USIHUDWidget::HandleChatMessage);
+		CachedGameState->OnAnswerResult.RemoveDynamic(this, &USIHUDWidget::HandleAnswerResult);
 	}
 	
 	if (CachedPlayerState.IsValid())
@@ -137,19 +141,31 @@ void USIHUDWidget::SetSecretWord(const FString& NewSecretWord)
 void USIHUDWidget::HandlePhaseChanged(ESIGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
-	
-	if (!EditableText_AnswerInput)
+
+	// 정답 입력창: BuildPhase엔 숨김, GuessPhase엔 표시
+	if (IsValid(EditableText_AnswerInput))
 	{
-		return;
+		if (NewPhase == ESIGamePhase::BuildPhase)
+		{
+			EditableText_AnswerInput->SetVisibility(ESlateVisibility::Hidden);
+		}
+		else if (NewPhase == ESIGamePhase::GuessPhase)
+		{
+			EditableText_AnswerInput->SetVisibility(ESlateVisibility::Visible);
+		}
 	}
-	
-	if (NewPhase == ESIGamePhase::BuildPhase)
+
+	// 제시어: BuildPhase엔 표시(그리는 사람이 봐야 함), GuessPhase엔 숨김(맞추는 사람에게 정답 노출 방지)
+	if (IsValid(Text_Keyword))
 	{
-		EditableText_AnswerInput->SetVisibility(ESlateVisibility::Hidden);
-	}
-	else if (NewPhase == ESIGamePhase::GuessPhase)
-	{
-		EditableText_AnswerInput->SetVisibility(ESlateVisibility::Visible);
+		if (NewPhase == ESIGamePhase::BuildPhase)
+		{
+			Text_Keyword->SetVisibility(ESlateVisibility::Visible);
+		}
+		else if (NewPhase == ESIGamePhase::GuessPhase)
+		{
+			Text_Keyword->SetVisibility(ESlateVisibility::Hidden);
+		}
 	}
 }
 

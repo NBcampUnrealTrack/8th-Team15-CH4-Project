@@ -9,7 +9,7 @@
 
 class UTextBlock;
 
-UCLASS()
+UCLASS(Blueprintable)
 class TEAMPROJECT_API USIChatLineWidget : public USIUserWidget
 {
 	GENERATED_BODY()

@@ -26,6 +26,16 @@ void USILobbySettingWidget::NativeDestruct()
 		Button_GameStart->OnClicked.RemoveDynamic(this, &USILobbySettingWidget::RequestStartGame);
 	}
 	
+	if (CachedPlayerState.IsValid())
+	{
+		CachedPlayerState->OnHostStatusChanged.RemoveDynamic(this, &USILobbySettingWidget::HandleHostStatusChanged);
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HostResolveRetryTimer);
+	}
+
 	Super::NativeDestruct();
 }
 
@@ -33,46 +43,43 @@ void USILobbySettingWidget::RequestStartGame()
 {
 	if (!bIsLocalPlayerHost)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[LobbySettingWidget] 방장이 아닌 플레이어의 게임 시작 요청 무시"));
 		return;
 	}
-
-	APlayerController* PC = GetOwningPlayer();
-	if (!PC)
+	
+	ASIPlayerState* PS = GetOwningPlayerState<ASIPlayerState>();
+	if (!IsValid(PS))
 	{
-		return;
-	}
-
-	ASIPlayerState* PS = PC->GetPlayerState<ASIPlayerState>();
-	if (!PS)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[LobbySettingWidget] SIPlayerState 미확보"));
 		return;
 	}
 
 	PS->Server_RequestStartGame();
 }
 
+void USILobbySettingWidget::HandleHostStatusChanged(bool bNewIsHost)
+{
+	bIsLocalPlayerHost = bNewIsHost;
+}
+
 void USILobbySettingWidget::ResolveHostStatus()
 {
-	APlayerController* PC = GetOwningPlayer();
-	if (!PC)
+	ASIPlayerState* PS = GetOwningPlayerState<ASIPlayerState>();
+	if (!IsValid(PS))
 	{
-		return;
-	}
-
-	ASIPlayerState* PS = PC->GetPlayerState<ASIPlayerState>();
-	if (!PS)
-	{
-		// PlayerState 아직 replicate 안 됐을 수 있음 - 짧게 재시도
 		if (UWorld* World = GetWorld())
 		{
-			FTimerHandle RetryHandle;
-			World->GetTimerManager().SetTimer(RetryHandle, this, &USILobbySettingWidget::ResolveHostStatus, 0.2f, false);
+			World->GetTimerManager().SetTimer(
+				HostResolveRetryTimer, this, &USILobbySettingWidget::ResolveHostStatus, 0.1f, false);
 		}
 		return;
 	}
+	
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HostResolveRetryTimer);
+	}
 
-	bIsLocalPlayerHost = PS->bIsHost;
-	OnHostStatusResolved(bIsLocalPlayerHost);
+	CachedPlayerState = PS;
+
+	PS->OnHostStatusChanged.AddDynamic(this, &USILobbySettingWidget::HandleHostStatusChanged);
+	HandleHostStatusChanged(PS->bIsHost);
 }

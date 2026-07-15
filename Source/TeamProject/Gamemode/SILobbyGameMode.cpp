@@ -51,8 +51,14 @@ void ASILobbyGameMode::BeginPlay()
 void ASILobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
-
-	AssignHostIfNeeded();
+	
+	if (IsValid(NewPlayer) && NewPlayer->GetNetConnection() == nullptr)
+	{
+		if (ASIPlayerState* HostState = NewPlayer->GetPlayerState<ASIPlayerState>())
+		{
+			HostState->SetIsHost(true);
+		}
+	}
 
 	if (ASIGameState* SIState = GetGameState<ASIGameState>())
 	{
@@ -100,8 +106,7 @@ void ASILobbyGameMode::AssignHostIfNeeded()
 
 	if (!bHasHost && FirstPlayerState)
 	{
-		FirstPlayerState->bIsHost = true;
-		FirstPlayerState->ForceNetUpdate();
+		FirstPlayerState->SetIsHost(true);
 	}
 }
 
