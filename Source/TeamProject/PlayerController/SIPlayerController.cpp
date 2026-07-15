@@ -59,7 +59,7 @@ void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answ
 		ASIGameMode* GameMode = GetWorld()->GetAuthGameMode<ASIGameMode>();
 		if (GameMode)
 		{
-			GameMode->OnChatReceived(this, Answer);
+			GameMode->OnAnswerSubmitted(this, Answer);
 			UE_LOG(LogTemp, Warning, TEXT("[서버] 클라이언트가 제출한 단어 수신: %s"), *Answer);
 		}
 	}

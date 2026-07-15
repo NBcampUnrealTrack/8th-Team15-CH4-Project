@@ -331,8 +331,7 @@ void ASIGameMode::EndGuessTurn()
 
 void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Message)
 {
-	ASIGameState* SIState = GetGameState<ASIGameState>();
-	if (!SIState || !IsValid(Sender) || !PlayerOrderList.Contains(Sender))
+	if (!IsValid(Sender) || !PlayerOrderList.Contains(Sender))
 	{
 		return;
 	}
@@ -344,11 +343,23 @@ void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Messa
 	}
 	NormalizedMessage.LeftInline(MaxChatLength);
 
-	if (SIState->CurrentGamePhase != ESIGamePhase::GuessPhase)
+	BroadcastChat(Sender, NormalizedMessage);
+}
+
+void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString& SubmittedAnswer)
+{
+	ASIGameState* SIState = GetGameState<ASIGameState>();
+	if (!SIState || !IsValid(Submitter) || !PlayerOrderList.Contains(Submitter))
 	{
-		BroadcastChat(Sender, NormalizedMessage);
 		return;
 	}
+
+	FString NormalizedAnswer = SubmittedAnswer.TrimStartAndEnd();
+	if (NormalizedAnswer.IsEmpty() || SIState->CurrentGamePhase != ESIGamePhase::GuessPhase)
+	{
+		return;
+	}
+	NormalizedAnswer.LeftInline(MaxChatLength);
 
 	if (!PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex))
 	{
@@ -362,31 +373,38 @@ void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Messa
 		return;
 	}
 
-	const bool bMatchesAnswer = NormalizedMessage.Equals(*CorrectAnswer, ESearchCase::IgnoreCase);
-	if (!bMatchesAnswer)
-	{
-		BroadcastChat(Sender, NormalizedMessage);
-		return;
-	}
-
-	// 정답 텍스트는 제출 자격과 무관하게 절대 채팅으로 내보내지 않습니다.
-	if (Sender == WorkspaceOwner || CorrectPlayersThisTurn.Contains(Sender))
+	ASIPlayerState* SubmitterState = Submitter->GetPlayerState<ASIPlayerState>();
+	if (!SubmitterState)
 	{
 		return;
 	}
-
-	ASIPlayerState* SenderState = Sender->GetPlayerState<ASIPlayerState>();
-	if (!SenderState)
-	{
-		return;
-	}
-
-	const int32 ScoreToEarn = FMath::Max(5 - CorrectPlayersThisTurn.Num(), 1);
-	SenderState->AddScore(ScoreToEarn);
-	CorrectPlayersThisTurn.Add(Sender);
 
 	FAnswerResultPayload Payload;
-	Payload.Submitter = SenderState;
+	Payload.Submitter = SubmitterState;
+	Payload.SubmittedAnswer = NormalizedAnswer;
+
+	const bool bMatchesAnswer = NormalizedAnswer.Equals(*CorrectAnswer, ESearchCase::IgnoreCase);
+	if (!bMatchesAnswer)
+	{
+		SIState->Multicast_BroadcastAnswerResult(Payload);
+		return;
+	}
+
+	// The workspace owner and players who already answered correctly cannot earn points.
+	if (Submitter == WorkspaceOwner || CorrectPlayersThisTurn.Contains(Submitter))
+	{
+		return;
+	}
+
+	const int32 ScoreIndex = FMath::Min(
+		CorrectPlayersThisTurn.Num(), CorrectAnswerScores.Num() - 1);
+	const int32 ScoreToEarn = CorrectAnswerScores.IsValidIndex(ScoreIndex)
+		? FMath::Max(CorrectAnswerScores[ScoreIndex], 0)
+		: 0;
+	SubmitterState->AddScore(ScoreToEarn);
+	CorrectPlayersThisTurn.Add(Submitter);
+
+	// Do not include the correct answer in data multicast to every client.
 	Payload.SubmittedAnswer = TEXT("");
 	Payload.ScoreEarned = ScoreToEarn;
 	Payload.bIsCorrect = true;

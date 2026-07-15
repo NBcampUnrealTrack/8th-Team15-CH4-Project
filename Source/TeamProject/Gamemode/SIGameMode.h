@@ -25,14 +25,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GameFlow")
 	void StartGameMatch();
 
-	// 채팅 입력의 일반 메시지/정답 여부를 서버에서 판정합니다.
+	// 채팅 입력을 검증하고 모든 클라이언트에 전달합니다.
 	void OnChatReceived(APlayerController* Sender, const FString& Message);
+
+	// 정답 입력 UI에서 제출된 답을 서버에서 검증하고 점수를 지급합니다.
+	void OnAnswerSubmitted(APlayerController* Submitter, const FString& SubmittedAnswer);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
 	float BuildTimeLimit = 120.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
 	float GuessTimeLimit = 30.0f;
+
+	// 정답 순위별 점수입니다. 정답자가 배열보다 많으면 마지막 점수를 계속 사용합니다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Score")
+	TArray<int32> CorrectAnswerScores = { 2, 1 };
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MainMenu UI")
