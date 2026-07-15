@@ -8,6 +8,7 @@
 
 class APlacedShapeActor;
 class APlacementPreviewActor;
+class USIColorPalette;
 class USIDrawingToolWidget;
 class USIPreviewTransformGizmoComponent;
 class UInputMappingContext;
@@ -139,6 +140,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
 	TObjectPtr<UDataTable> ShapeDefinitionTable;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement|Color")
+	TObjectPtr<USIColorPalette> ColorPalette;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
 	TSubclassOf<APlacementPreviewActor> PreviewActorClass;
 	
@@ -177,9 +181,13 @@ private:
 	FName CurrentPreviewShapeId;
 	FRotator PreviewRotation;
 	FVector PreviewScale;
+	uint8 CurrentPreviewColorIndex = 0;
+	FLinearColor CurrentPreviewColor = FLinearColor::White;
 	bool bIsEditingExistingShape;
 	FName EditingOriginalShapeId;
 	FTransform EditingOriginalTransform;
+	uint8 EditingOriginalColorIndex = 0;
+	FLinearColor EditingOriginalColor = FLinearColor::White;
 	EObjectEditState ObjectEditState = EObjectEditState::None;
 	bool bApplyingGizmoTransform = false;
 	bool bIsGizmoDragging = false;
@@ -187,6 +195,9 @@ private:
 public:
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void StartShapePreview(FName ShapeId);
+
+	UFUNCTION(BlueprintCallable, Category = "Placement|Color")
+	void SetSelectedPaletteColor(int32 ColorIndex, FLinearColor Color);
 	
 private:
 	// Detail Panel Transform 편집은 기즈모로 이전되어 임시 비활성화한다.
@@ -195,7 +206,7 @@ private:
 	void UpdatePreviewTransform();
 	void UpdateHoveredShape();
 	void SetHoveredShape(APlacedShapeActor* NewHoveredShape);
-	void StartEditPreview(FName ShapeId, const FTransform& PreviewTransform);
+	void StartEditPreview(FName ShapeId, const FTransform& PreviewTransform, uint8 ColorIndex, const FLinearColor& Color);
 	void ClearPreview();
 	void UpdateShapePanelAvailability();
 	void HandlePrimaryActionStarted();
@@ -216,13 +227,13 @@ private:
 	// void HandlePreviewScaleChanged(EAxis::Type Axis, float Value);
 	
 	UFUNCTION(Server, Reliable)
-	void Server_RequestSpawnShape(FName ShapeId, FTransform SpawnTransform);
+	void Server_RequestSpawnShape(FName ShapeId, FTransform SpawnTransform, uint8 ColorIndex);
 
 	UFUNCTION(Server, Reliable)
 	void Server_RequestEditShape(APlacedShapeActor* TargetShape);
 
 	UFUNCTION(Client, Reliable)
-	void Client_StartEditShape(FName ShapeId, FTransform PreviewTransform);
+	void Client_StartEditShape(FName ShapeId, FTransform PreviewTransform, uint8 ColorIndex, FLinearColor Color);
 	
 #pragma endregion
 	

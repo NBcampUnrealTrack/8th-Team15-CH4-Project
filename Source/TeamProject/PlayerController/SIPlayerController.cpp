@@ -2,6 +2,7 @@
 
 
 #include "PlayerController/SIPlayerController.h"
+#include "Character/SICharacter.h"
 #include "GameMode/SIGameMode.h"         
 #include "GameState/SIGameState.h"        
 #include "UI/SIDrawingToolWidget.h"
@@ -255,6 +256,7 @@ void ASIPlayerController::CloseAllPhaseWidgets()
 	
 	if (DrawingToolWidget)
 	{
+		DrawingToolWidget->OnColorSelected.RemoveDynamic(this, &ThisClass::HandleDrawingToolColorSelected);
 		DrawingToolWidget->RemoveFromParent();
 		DrawingToolWidget = nullptr;
 	}
@@ -296,7 +298,10 @@ void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 		{
 			HUDWidget = CreateWidget<USIHUDWidget>(this, HUDWidgetClass);
 			DrawingToolWidget = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidgetClass);
-			
+
+			// 플레이어 컨트롤러가 UI 이벤트를 현재 소유 캐릭터의 편집 상태로 전달한다.
+			DrawingToolWidget->OnColorSelected.AddUniqueDynamic(this, &ThisClass::HandleDrawingToolColorSelected);
+
 			HUDWidget->SetSecretWord(CachedSecretWord);
 			
 			HUDWidget->AddToViewport();
@@ -321,6 +326,14 @@ void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 		break;
 	}
 	
+}
+
+void ASIPlayerController::HandleDrawingToolColorSelected(int32 ColorIndex, FLinearColor Color)
+{
+	if (ASICharacter* SICharacter = Cast<ASICharacter>(GetPawn()))
+	{
+		SICharacter->SetSelectedPaletteColor(ColorIndex, Color);
+	}
 }
 
 void ASIPlayerController::TryCacheGameState()

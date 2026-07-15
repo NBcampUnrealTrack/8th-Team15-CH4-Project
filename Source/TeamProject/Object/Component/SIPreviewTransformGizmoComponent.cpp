@@ -1,6 +1,9 @@
 #include "Object/Component/SIPreviewTransformGizmoComponent.h"
 
 #include "BaseGizmos/CombinedTransformGizmo.h"
+#include "BaseGizmos/GizmoBaseComponent.h"
+#include "BaseGizmos/GizmoBoxComponent.h"
+#include "BaseGizmos/GizmoRectangleComponent.h"
 #include "BaseGizmos/GizmoViewContext.h"
 #include "BaseGizmos/TransformGizmoUtil.h"
 #include "BaseGizmos/TransformProxy.h"
@@ -19,6 +22,53 @@
 #include "Materials/Material.h"
 #include "SceneView.h"
 #include "ToolContextInterfaces.h"
+
+namespace
+{
+	constexpr float ScaleHandleSizeMultiplier = 1.5f;
+	constexpr float ScaleHandleHitDistance = 10.0f;
+
+	void EnlargeScaleHandle(UPrimitiveComponent* PrimitiveComponent)
+	{
+		UGizmoBaseComponent* BaseComponent = Cast<UGizmoBaseComponent>(PrimitiveComponent);
+		if (!BaseComponent)
+		{
+			return;
+		}
+
+		BaseComponent->PixelHitDistanceThreshold = ScaleHandleHitDistance;
+
+		if (UGizmoRectangleComponent* RectangleComponent = Cast<UGizmoRectangleComponent>(BaseComponent))
+		{
+			RectangleComponent->LengthX *= ScaleHandleSizeMultiplier;
+			RectangleComponent->LengthY *= ScaleHandleSizeMultiplier;
+			RectangleComponent->Thickness *= ScaleHandleSizeMultiplier;
+		}
+		else if (UGizmoBoxComponent* BoxComponent = Cast<UGizmoBoxComponent>(BaseComponent))
+		{
+			BoxComponent->Dimensions *= ScaleHandleSizeMultiplier;
+			BoxComponent->LineThickness *= ScaleHandleSizeMultiplier;
+		}
+
+		BaseComponent->NotifyExternalPropertyUpdates();
+	}
+
+	void EnlargeScaleHandles(ACombinedTransformGizmoActor* GizmoActor)
+	{
+		if (!GizmoActor)
+		{
+			return;
+		}
+
+		EnlargeScaleHandle(GizmoActor->UniformScale);
+		EnlargeScaleHandle(GizmoActor->AxisScaleX);
+		EnlargeScaleHandle(GizmoActor->AxisScaleY);
+		EnlargeScaleHandle(GizmoActor->AxisScaleZ);
+		EnlargeScaleHandle(GizmoActor->PlaneScaleYZ);
+		EnlargeScaleHandle(GizmoActor->PlaneScaleXZ);
+		EnlargeScaleHandle(GizmoActor->PlaneScaleXY);
+	}
+}
 
 class FSITransformGizmoQueries : public IToolsContextQueriesAPI
 {
@@ -219,6 +269,7 @@ bool USIPreviewTransformGizmoComponent::StartEditing(AActor* TargetActor, bool b
 	TransformGizmo->SetVisibility(true);
 	if (ACombinedTransformGizmoActor* GizmoActor = TransformGizmo->GetGizmoActor())
 	{
+		EnlargeScaleHandles(GizmoActor);
 		GizmoActor->SetActorHiddenInGame(false);
 		TInlineComponentArray<UPrimitiveComponent*> PrimitiveComponents(GizmoActor);
 		for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)

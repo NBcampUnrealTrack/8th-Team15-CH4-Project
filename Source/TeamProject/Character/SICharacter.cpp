@@ -14,6 +14,7 @@
 #include "Components/Widget.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "DataAsset/SIColorPalette.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Input/SIIPlayerCharacternputConfig.h"
 #include "Object/PlacedShapeActor.h"
@@ -96,6 +97,17 @@ ASICharacter::ASICharacter()
 void ASICharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!ColorPalette)
+	{
+		ColorPalette = USIColorPalette::LoadDefaultPalette();
+	}
+
+	// 새 프리뷰는 팔레트의 첫 번째 색상을 기본값으로 사용한다.
+	if (ColorPalette)
+	{
+		ColorPalette->TryGetColor(CurrentPreviewColorIndex, CurrentPreviewColor);
+	}
 	
 	if (IsValid(PlayerCharacterInputMappingContext) == false)
 	{
@@ -422,7 +434,7 @@ void ASICharacter::ConfirmPlacement()
 	if (PreviewActor && !CurrentPreviewShapeId.IsNone())
 	{
 		// 설치는 서버에서 확정
-		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform());
+		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform(), CurrentPreviewColorIndex);
 		if (ObjectEditState == EObjectEditState::Preview && !bIsEditingExistingShape)
 		{
 			// 일반 프리뷰는 유지하여 같은 도형을 연속으로 설치한다.
@@ -455,7 +467,7 @@ void ASICharacter::CancelPreview()
 	if (bIsEditingExistingShape && !EditingOriginalShapeId.IsNone())
 	{
 		// 편집 취소 시 원래 도형 복구
-		Server_RequestSpawnShape(EditingOriginalShapeId, EditingOriginalTransform);
+		Server_RequestSpawnShape(EditingOriginalShapeId, EditingOriginalTransform, EditingOriginalColorIndex);
 	}
 
 	ClearPreview();
@@ -519,7 +531,7 @@ void ASICharacter::UpdateShapePanelAvailability()
 {
 	ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
 	
-	if (IsValid(PlayerController))
+	if (!IsValid(PlayerController))
 	{
 		return;
 	}
@@ -567,6 +579,8 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 
 	if (PreviewActor && PreviewActor->SetPreviewShape(ShapeDefinitionTable, ShapeId))
 	{
+		// 도형을 바꿔도 사용자가 마지막으로 고른 색상을 유지한다.
+		PreviewActor->SetPreviewColor(CurrentPreviewColor);
 		SetHoveredShape(nullptr);
 		CurrentPreviewShapeId = ShapeId;
 		PreviewRotation = FRotator::ZeroRotator;
@@ -581,6 +595,24 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 		// UI에서 도형을 골라도 모드는 유지하고 백틱/ESC로만 Play 모드에 복귀한다.
 		SetObjectGizmoInputMode(bIsUIOnlyMode);
 		// SyncDetailPanelToPreview();
+	}
+}
+
+void ASICharacter::SetSelectedPaletteColor(int32 ColorIndex, FLinearColor Color)
+{
+	FLinearColor ValidatedColor;
+	if (!ColorPalette || !ColorPalette->TryGetColor(ColorIndex, ValidatedColor))
+	{
+		return;
+	}
+
+	CurrentPreviewColorIndex = static_cast<uint8>(ColorIndex);
+	CurrentPreviewColor = Color.Equals(ValidatedColor) ? Color : ValidatedColor;
+
+	// 프리뷰, 선택, 재배치는 같은 PreviewActor를 사용하므로 한 번에 반영된다.
+	if (PreviewActor)
+	{
+		PreviewActor->SetPreviewColor(CurrentPreviewColor);
 	}
 }
 
@@ -744,7 +776,7 @@ void ASICharacter::SetHoveredShape(APlacedShapeActor* NewHoveredShape)
 }
 
 // 기존에 배치된 도형을 프리뷰 상태로 전환해 편집을 시작한다.
-void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTransform)
+void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTransform, uint8 ColorIndex, const FLinearColor& Color)
 {
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PreviewActorClass)
 	{
@@ -766,6 +798,12 @@ void ASICharacter::StartEditPreview(FName ShapeId, const FTransform& PreviewTran
 
 	if (PreviewActor && PreviewActor->SetPreviewShape(ShapeDefinitionTable, ShapeId))
 	{
+		// 선택한 기존 도형의 색상과 취소 시 복구할 원본 색상을 함께 보관한다.
+		CurrentPreviewColorIndex = ColorIndex;
+		CurrentPreviewColor = Color;
+		EditingOriginalColorIndex = ColorIndex;
+		EditingOriginalColor = Color;
+		PreviewActor->SetPreviewColor(CurrentPreviewColor);
 		SetHoveredShape(nullptr);
 		CurrentPreviewShapeId = ShapeId;
 		bIsEditingExistingShape = true;
@@ -829,6 +867,8 @@ void ASICharacter::ClearPreview()
 	bIsEditingExistingShape = false;
 	EditingOriginalShapeId = NAME_None;
 	EditingOriginalTransform = FTransform::Identity;
+	EditingOriginalColorIndex = 0;
+	EditingOriginalColor = FLinearColor::White;
 	ObjectEditState = EObjectEditState::None;
 	UpdateShapePanelAvailability();
 
@@ -1078,7 +1118,7 @@ bool ASICharacter::IsSelectionCameraLocked() const
 	return ObjectEditState == EObjectEditState::Selected;
 }
 
-void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform)
+void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform, uint8 ColorIndex)
 {
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
 	{
@@ -1087,6 +1127,17 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 
 	const FShapeDefinitionRow* ShapeDefinition = ShapeDefinitionTable->FindRow<FShapeDefinitionRow>(ShapeId, TEXT("Server_RequestSpawnShape"));
 	if (!ShapeDefinition || !ShapeDefinition->Mesh)
+	{
+		return;
+	}
+
+	if (!ColorPalette)
+	{
+		ColorPalette = USIColorPalette::LoadDefaultPalette();
+	}
+
+	FLinearColor ValidatedColor;
+	if (!ColorPalette || !ColorPalette->TryGetColor(ColorIndex, ValidatedColor))
 	{
 		return;
 	}
@@ -1104,7 +1155,8 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 	APlacedShapeActor* PlacedShape = World->SpawnActor<APlacedShapeActor>(PlacedShapeActorClass, SpawnTransform, SpawnParameters);
 	if (PlacedShape)
 	{
-		PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D());
+		// 서버가 검증한 팔레트 색상만 실제 배치 도형에 저장한다.
+		PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor);
 	}
 }
 
@@ -1156,16 +1208,18 @@ void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* Tar
 	}
 
 	const FTransform PreviewTransform = TargetShape->GetActorTransform();
+	const uint8 ColorIndex = TargetShape->GetPaletteColorIndex();
+	const FLinearColor ShapeColor = TargetShape->GetShapeColor();
 	TargetShape->SetBeingEdited(true);
 	TargetShape->Destroy();
 
-	Client_StartEditShape(ShapeId, PreviewTransform);
+	Client_StartEditShape(ShapeId, PreviewTransform, ColorIndex, ShapeColor);
 }
 
 // 클라이언트에서 편집 프리뷰를 시작한다.
-void ASICharacter::Client_StartEditShape_Implementation(FName ShapeId, FTransform PreviewTransform)
+void ASICharacter::Client_StartEditShape_Implementation(FName ShapeId, FTransform PreviewTransform, uint8 ColorIndex, FLinearColor Color)
 {
-	StartEditPreview(ShapeId, PreviewTransform);
+	StartEditPreview(ShapeId, PreviewTransform, ColorIndex, Color);
 }
 
 #pragma endregion

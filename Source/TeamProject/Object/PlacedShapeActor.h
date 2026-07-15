@@ -8,6 +8,7 @@
 
 class UDataTable;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UBoxComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -26,8 +27,11 @@ public:
 	bool SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId);
 	// 지정한 스케일을 유지한 채 배치 도형 정보를 설정한다.
 	bool SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId, const FVector& PlacedScale);
+	bool SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId, const FVector& PlacedScale, uint8 ColorIndex, const FLinearColor& Color);
 	// 현재 배치된 도형의 ShapeId를 반환한다.
 	FName GetShapeId() const;
+	uint8 GetPaletteColorIndex() const;
+	FLinearColor GetShapeColor() const;
 	// 다른 플레이어가 편집 중인지 확인한다.
 	bool IsBeingEdited() const;
 	// 편집 중 상태를 설정한다.
@@ -64,6 +68,18 @@ private:
 	// 클라이언트에 복제되는 배치 스케일
 	UPROPERTY(ReplicatedUsing = OnRep_ShapeVisuals)
 	FVector ReplicatedScale;
+
+	UPROPERTY(Replicated)
+	uint8 ReplicatedColorIndex;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ShapeVisuals)
+	FLinearColor ReplicatedColor;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> PlacedMaterialInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> AppliedBaseMaterial;
 
 	UFUNCTION()
 	void OnRep_ShapeVisuals();

@@ -6,8 +6,14 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DataTable.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "Object/ShapeDefinitionRow.h"
+
+namespace
+{
+	const FName PlacedShapeColorParameterName(TEXT("ShapeColor"));
+}
 
 // 배치 도형의 기본 컴포넌트와 복제 설정을 초기화한다.
 APlacedShapeActor::APlacedShapeActor()
@@ -17,6 +23,8 @@ APlacedShapeActor::APlacedShapeActor()
 	SetReplicateMovement(true);
 	bIsBeingEdited = false;
 	ReplicatedScale = FVector::OneVector;
+	ReplicatedColorIndex = 0;
+	ReplicatedColor = FLinearColor::White;
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
@@ -42,6 +50,8 @@ void APlacedShapeActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(APlacedShapeActor, ReplicatedMesh);
 	DOREPLIFETIME(APlacedShapeActor, ReplicatedMaterial);
 	DOREPLIFETIME(APlacedShapeActor, ReplicatedScale);
+	DOREPLIFETIME(APlacedShapeActor, ReplicatedColorIndex);
+	DOREPLIFETIME(APlacedShapeActor, ReplicatedColor);
 }
 
 // 도형 정의의 기본 스케일을 사용해 배치 도형을 설정한다.
@@ -64,6 +74,11 @@ bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName S
 // 도형 정의와 전달받은 스케일을 사용해 배치 도형을 설정한다.
 bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId, const FVector& PlacedScale)
 {
+	return SetPlacedShape(ShapeDefinitionTable, ShapeId, PlacedScale, 0, FLinearColor::White);
+}
+
+bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName ShapeId, const FVector& PlacedScale, uint8 ColorIndex, const FLinearColor& Color)
+{
 	if (!ShapeDefinitionTable || ShapeId.IsNone())
 	{
 		return false;
@@ -79,6 +94,8 @@ bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName S
 	ReplicatedMesh = ShapeDefinition->Mesh;
 	ReplicatedMaterial = ShapeDefinition->PlacedMaterial;
 	ReplicatedScale = PlacedScale;
+	ReplicatedColorIndex = ColorIndex;
+	ReplicatedColor = Color;
 
 	ApplyShapeVisuals();
 	return true;
@@ -88,6 +105,16 @@ bool APlacedShapeActor::SetPlacedShape(UDataTable* ShapeDefinitionTable, FName S
 FName APlacedShapeActor::GetShapeId() const
 {
 	return ReplicatedShapeId;
+}
+
+uint8 APlacedShapeActor::GetPaletteColorIndex() const
+{
+	return ReplicatedColorIndex;
+}
+
+FLinearColor APlacedShapeActor::GetShapeColor() const
+{
+	return ReplicatedColor;
 }
 
 // 도형이 편집 중인지 반환한다.
@@ -126,7 +153,17 @@ void APlacedShapeActor::ApplyShapeVisuals()
 
 	if (ReplicatedMaterial)
 	{
-		MeshComponent->SetMaterial(0, ReplicatedMaterial);
+		if (!PlacedMaterialInstance || AppliedBaseMaterial != ReplicatedMaterial)
+		{
+			// 도형마다 독립 MID를 만들어 복제된 색상을 개별 적용한다.
+			PlacedMaterialInstance = MeshComponent->CreateDynamicMaterialInstance(0, ReplicatedMaterial);
+			AppliedBaseMaterial = ReplicatedMaterial;
+		}
+
+		if (PlacedMaterialInstance)
+		{
+			PlacedMaterialInstance->SetVectorParameterValue(PlacedShapeColorParameterName, ReplicatedColor);
+		}
 	}
 
 	SetActorScale3D(ReplicatedScale);

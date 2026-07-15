@@ -121,6 +121,9 @@ private:
 	void CloseParticipantsListWidget();
 	
 	void CloseAllPhaseWidgets();
+
+	UFUNCTION()
+	void HandleDrawingToolColorSelected(int32 ColorIndex, FLinearColor Color);
 	
 	//========== LobbySettingWidget ==========
 	UPROPERTY(EditDefaultsOnly, Category = "LobbySettingWidget", meta = (AllowPrivateAccess = "true"))

@@ -5,7 +5,13 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DataTable.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Object/ShapeDefinitionRow.h"
+
+namespace
+{
+	const FName PreviewShapeColorParameterName(TEXT("ShapeColor"));
+}
 
 // 로컬 전용 프리뷰 메시 컴포넌트를 생성한다.
 APlacementPreviewActor::APlacementPreviewActor()
@@ -35,11 +41,22 @@ bool APlacementPreviewActor::SetPreviewShape(UDataTable* ShapeDefinitionTable, F
 	MeshComponent->SetStaticMesh(ShapeDefinition->Mesh);
 	if (ShapeDefinition->PreviewMaterial)
 	{
-		MeshComponent->SetMaterial(0, ShapeDefinition->PreviewMaterial);
+		// 프리뷰 전용 MID를 만들어 선택 색상이 다른 도형에 영향을 주지 않게 한다.
+		PreviewMaterialInstance = MeshComponent->CreateDynamicMaterialInstance(0, ShapeDefinition->PreviewMaterial);
+		SetPreviewColor(CurrentPreviewColor);
 	}
 
 	SetActorScale3D(ShapeDefinition->DefaultScale);
 	return true;
+}
+
+void APlacementPreviewActor::SetPreviewColor(const FLinearColor& Color)
+{
+	CurrentPreviewColor = Color;
+	if (PreviewMaterialInstance)
+	{
+		PreviewMaterialInstance->SetVectorParameterValue(PreviewShapeColorParameterName, CurrentPreviewColor);
+	}
 }
 
 // 표면 히트 위치를 기준으로 프리뷰 Transform을 갱신한다.
