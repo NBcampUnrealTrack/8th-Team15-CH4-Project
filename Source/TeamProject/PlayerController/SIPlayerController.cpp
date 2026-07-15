@@ -340,6 +340,11 @@ void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
 	CloseAllPhaseWidgets();
+
+	if (ASICharacter* SICharacter = Cast<ASICharacter>(GetPawn()))
+	{
+		SICharacter->HandleShapeEditingPhaseChanged(NewPhase);
+	}
 	
 	switch (NewPhase)
 	{

@@ -16,6 +16,7 @@
 #include "Components/CapsuleComponent.h"
 #include "DataAsset/SIColorPalette.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameState/SIGameState.h"
 #include "Input/SIIPlayerCharacternputConfig.h"
 #include "Object/PlacedShapeActor.h"
 #include "Object/Component/SIPreviewTransformGizmoComponent.h"
@@ -160,6 +161,11 @@ void ASICharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	UpdatePreviewTransform();
 	UpdateHoveredShape();
 	UpdateSelectedCameraFocus();
@@ -236,7 +242,6 @@ void ASICharacter::Move(const FInputActionValue& InValue)
 	}
 	
 	const FVector MovementVector = InValue.Get<FVector>();
-	UE_LOG(LogTemp, Warning, TEXT("Input: %s"), *MovementVector.ToString());
 	
 	if (IsValid(Controller) == false)
 	{
@@ -284,7 +289,6 @@ void ASICharacter::Move(const FInputActionValue& InValue)
 			ServerRPCSetMovementMode(MOVE_Falling);
 			// 중력의 영향으로 덜컥 거리는 현상 방지
 			GetCharacterMovement()->Velocity.Z = 0.f;
-			GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("GetCharacterMovement()->SetMovementMode(MOVE_Falling)"));
 			// 1틱 뒤에 자동 호출되지만 자연스러움을 위해 직접 호출
 			Landed(FloorResult.HitResult);
 		}
@@ -308,7 +312,6 @@ void ASICharacter::Look(const FInputActionValue& InValue)
 void ASICharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
-	GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("ASICharacter::Landed"));
 	// Effect, Sound Code
 }
 
@@ -340,13 +343,11 @@ void ASICharacter::HandleJumpNFly()
 				ServerRPCSetMovementMode(MOVE_Flying);
 				// 캐릭터 Z값 이동속도 0으로 수정하여 기존 Z축 속도로 인한 예외 상황 방지
 				GetCharacterMovement()->Velocity.Z = 0.0f; 
-				GEngine->AddOnScreenDebugMessage(1, 5.0f, FColor::Red, TEXT("EMovementMode::MOVE_Flying"));
 			}
 			else
 			{
 				// Falling 상태로 전환
 				ServerRPCSetMovementMode(MOVE_Falling);
-				GEngine->AddOnScreenDebugMessage(2, 5.0f, FColor::Red, TEXT("EMovementMode::MOVE_Falling"));
 			}
 
 		}
@@ -355,7 +356,6 @@ void ASICharacter::HandleJumpNFly()
 	{
 		// Jump 함수 실행
 		Jump();
-		GEngine->AddOnScreenDebugMessage(3, 5.0f, FColor::Red, TEXT("Jump()"));
 	}
 	
 	// 마지막 점프 시간 갱신
@@ -431,6 +431,11 @@ void ASICharacter::StartConePreview()
 
 void ASICharacter::ConfirmPlacement()
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	if (PreviewActor && !CurrentPreviewShapeId.IsNone())
 	{
 		// 설치는 서버에서 확정
@@ -464,6 +469,12 @@ void ASICharacter::CancelPreview()
 		return;
 	}
 
+	if (!IsShapeEditingAllowed())
+	{
+		ClearPreview();
+		return;
+	}
+
 	if (bIsEditingExistingShape && !EditingOriginalShapeId.IsNone())
 	{
 		// 편집 취소 시 원래 도형 복구
@@ -475,12 +486,22 @@ void ASICharacter::CancelPreview()
 
 void ASICharacter::IncreasePreviewDistance()
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	PreviewDistance = FMath::Clamp(PreviewDistance + PreviewDistanceStep, MinPreviewDistance, MaxPreviewDistance);
 	UpdatePreviewTransform();
 }
 
 void ASICharacter::DecreasePreviewDistance()
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	PreviewDistance = FMath::Clamp(PreviewDistance - PreviewDistanceStep, MinPreviewDistance, MaxPreviewDistance);
 	UpdatePreviewTransform();
 }
@@ -489,6 +510,11 @@ void ASICharacter::DecreasePreviewDistance()
 //선택 상태가 아닐시 도형의 로테이트, 스케일 값 초기화 
 void ASICharacter::ResetPreviewTransform()
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	if (!PreviewActor || CurrentPreviewShapeId.IsNone())
 	{
 		return;
@@ -554,6 +580,11 @@ void ASICharacter::UpdateShapePanelAvailability()
 // 선택한 도형의 배치 프리뷰를 시작한다.
 void ASICharacter::StartShapePreview(FName ShapeId)
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	if (ObjectEditState == EObjectEditState::Selected || ObjectEditState == EObjectEditState::Rebase)
 	{
 		return;
@@ -600,6 +631,11 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 
 void ASICharacter::SetSelectedPaletteColor(int32 ColorIndex, FLinearColor Color)
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	FLinearColor ValidatedColor;
 	if (!ColorPalette || !ColorPalette->TryGetColor(ColorIndex, ValidatedColor))
 	{
@@ -948,6 +984,11 @@ void ASICharacter::HandlePreviewScaleChanged(EAxis::Type Axis, float Value)
 // 서버에서 실제 배치 도형을 생성한다.
 void ASICharacter::HandlePrimaryActionStarted()
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	// 프리뷰와 선택 상태에서는 기즈모가 마우스 입력을 먼저 처리한다.
 	const bool bCanInteractWithGizmo = ObjectEditState != EObjectEditState::Rebase || bIsUIOnlyMode;
 	if (bCanInteractWithGizmo && PreviewTransformGizmoComponent && PreviewTransformGizmoComponent->TryBeginMouseInteraction())
@@ -986,6 +1027,11 @@ void ASICharacter::HandlePrimaryActionCompleted()
 
 void ASICharacter::ToggleRebaseMode()
 {
+	if (!IsShapeEditingAllowed())
+	{
+		return;
+	}
+
 	if (!PreviewActor || !bIsEditingExistingShape)
 	{
 		return;
@@ -1045,7 +1091,7 @@ void ASICharacter::SetObjectGizmoInputMode(bool bEnable)
 
 void ASICharacter::HandlePreviewGizmoTransformChanged(const FTransform& NewTransform)
 {
-	if (!PreviewActor || bApplyingGizmoTransform)
+	if (!IsShapeEditingAllowed() || !PreviewActor || bApplyingGizmoTransform)
 	{
 		return;
 	}
@@ -1118,8 +1164,123 @@ bool ASICharacter::IsSelectionCameraLocked() const
 	return ObjectEditState == EObjectEditState::Selected;
 }
 
+bool ASICharacter::IsShapeEditingAllowed() const
+{
+	const UWorld* World = GetWorld();
+	const ASIGameState* SIState = World ? World->GetGameState<ASIGameState>() : nullptr;
+	return SIState && SIState->CurrentGamePhase == ESIGamePhase::BuildPhase;
+}
+
+bool ASICharacter::IsServerInBuildPhase() const
+{
+	return HasAuthority() && IsShapeEditingAllowed();
+}
+
+void ASICharacter::HandleShapeEditingPhaseChanged(const ESIGamePhase NewPhase)
+{
+	if (NewPhase == ESIGamePhase::BuildPhase)
+	{
+		return;
+	}
+
+	SetHoveredShape(nullptr);
+	ClearPreview();
+
+	// 백틱으로 UI 모드에 들어가 있었다면 도형 편집 정리 후에도 그 상태를 유지한다.
+	if (bIsUIOnlyMode)
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			PlayerController->SetIgnoreMoveInput(true);
+			PlayerController->SetIgnoreLookInput(true);
+
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+			InputMode.SetHideCursorDuringCapture(false);
+			PlayerController->SetInputMode(InputMode);
+			PlayerController->bShowMouseCursor = true;
+		}
+	}
+}
+
+void ASICharacter::ClearServerShapeEditState()
+{
+	bHasServerActiveShapeEdit = false;
+	ServerEditingOriginalShapeId = NAME_None;
+	ServerEditingOriginalTransform = FTransform::Identity;
+	ServerEditingOriginalColorIndex = 0;
+}
+
+bool ASICharacter::SpawnPlacedShapeOnServer(
+	const FName ShapeId, const FTransform& SpawnTransform, const uint8 ColorIndex)
+{
+	if (!HasAuthority() || !ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
+	{
+		return false;
+	}
+
+	const FShapeDefinitionRow* ShapeDefinition = ShapeDefinitionTable->FindRow<FShapeDefinitionRow>(
+		ShapeId, TEXT("SpawnPlacedShapeOnServer"));
+	if (!ShapeDefinition || !ShapeDefinition->Mesh)
+	{
+		return false;
+	}
+
+	if (!ColorPalette)
+	{
+		ColorPalette = USIColorPalette::LoadDefaultPalette();
+	}
+
+	FLinearColor ValidatedColor;
+	if (!ColorPalette || !ColorPalette->TryGetColor(ColorIndex, ValidatedColor))
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.Instigator = this;
+
+	APlacedShapeActor* PlacedShape = World->SpawnActor<APlacedShapeActor>(
+		PlacedShapeActorClass, SpawnTransform, SpawnParameters);
+	return PlacedShape && PlacedShape->SetPlacedShape(
+		ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor);
+}
+
+void ASICharacter::RestoreActiveShapeEditForPhaseChange()
+{
+	if (!HasAuthority() || !bHasServerActiveShapeEdit)
+	{
+		return;
+	}
+
+	if (SpawnPlacedShapeOnServer(
+		ServerEditingOriginalShapeId,
+		ServerEditingOriginalTransform,
+		ServerEditingOriginalColorIndex))
+	{
+		ClearServerShapeEditState();
+	}
+}
+
 void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTransform SpawnTransform, uint8 ColorIndex)
 {
+	if (!IsServerInBuildPhase())
+	{
+		return;
+	}
+
+	if (bHasServerActiveShapeEdit && ShapeId != ServerEditingOriginalShapeId)
+	{
+		return;
+	}
+
 	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
 	{
 		return;
@@ -1156,13 +1317,22 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 	if (PlacedShape)
 	{
 		// 서버가 검증한 팔레트 색상만 실제 배치 도형에 저장한다.
-		PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor);
+		if (PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor)
+			&& bHasServerActiveShapeEdit)
+		{
+			ClearServerShapeEditState();
+		}
 	}
 }
 
 // 서버에서 편집 대상 도형을 확인하고 편집 프리뷰 시작을 클라이언트에 요청한다.
 void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* TargetShape)
 {
+	if (!IsServerInBuildPhase() || bHasServerActiveShapeEdit)
+	{
+		return;
+	}
+
 	APawn* ControlledPawn = this;
 	if (!ControlledPawn)
 	{
@@ -1210,6 +1380,10 @@ void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* Tar
 	const FTransform PreviewTransform = TargetShape->GetActorTransform();
 	const uint8 ColorIndex = TargetShape->GetPaletteColorIndex();
 	const FLinearColor ShapeColor = TargetShape->GetShapeColor();
+	bHasServerActiveShapeEdit = true;
+	ServerEditingOriginalShapeId = ShapeId;
+	ServerEditingOriginalTransform = PreviewTransform;
+	ServerEditingOriginalColorIndex = ColorIndex;
 	TargetShape->SetBeingEdited(true);
 	TargetShape->Destroy();
 

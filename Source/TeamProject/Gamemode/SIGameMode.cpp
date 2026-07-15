@@ -1,7 +1,11 @@
 #include "SIGameMode.h"
 
+#include "Character/SICharacter.h"
 #include "Engine/DataTable.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameInstance/SIGameInstance.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "GameState/SIGameState.h"
 #include "PlayerController/SIPlayerController.h"
@@ -125,6 +129,7 @@ void ASIGameMode::Logout(AController* Exiting)
 		PlayerOrderList.RemoveAt(RemovedIndex);
 		PlayerAssignedWords.Remove(ExitingPlayer);
 		CorrectPlayersThisTurn.Remove(ExitingPlayer);
+		PlayerWorkspaceAreas.Remove(ExitingPlayer);
 
 		if (RemovedIndex < CurrentWorkspaceIndex)
 		{
@@ -157,6 +162,30 @@ void ASIGameMode::Logout(AController* Exiting)
 		GetWorldTimerManager().ClearTimer(GameTimerHandle);
 		GetWorldTimerManager().SetTimerForNextTick(this, &ASIGameMode::StartNextGuessTurn);
 	}
+}
+
+void ASIGameMode::RegisterPlayerWorkspace(APlayerController* Player, AActor* WorkspaceArea)
+{
+	if (!HasAuthority() || !IsValid(Player) || !IsValid(WorkspaceArea))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GameMode][Workspace] 등록 실패: Player=%s, Area=%s"),
+			*GetNameSafe(Player), *GetNameSafe(WorkspaceArea));
+		return;
+	}
+
+	if (!PlayerOrderList.Contains(Player))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GameMode][Workspace] 게임 참가자가 아닌 Controller입니다: %s"),
+			*GetNameSafe(Player));
+		return;
+	}
+
+	PlayerWorkspaceAreas.Add(Player, WorkspaceArea);
+	UE_LOG(LogTemp, Log,
+		TEXT("[GameMode][Workspace] 등록 완료: %s -> %s"),
+		*GetNameSafe(Player), *GetNameSafe(WorkspaceArea));
 }
 
 bool ASIGameMode::AssignWordsToPlayers()
@@ -245,7 +274,19 @@ void ASIGameMode::StartGameMatch()
 		return;
 	}
 
+	PlayerWorkspaceAreas.Empty();
 	SpawnPlayersToIndividualWorkspaces();
+
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		if (!PlayerWorkspaceAreas.Contains(Player))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GameMode][Workspace] %s의 작업공간이 등록되지 않았습니다. "
+					"BP의 Individual 배치 직후 RegisterPlayerWorkspace를 호출해야 합니다."),
+				*GetNameSafe(Player));
+		}
+	}
 
 	for (APlayerController* Player : PlayerOrderList)
 	{
@@ -287,6 +328,17 @@ void ASIGameMode::OnUITimerTick()
 
 void ASIGameMode::EndBuildPhase()
 {
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		if (IsValid(Player))
+		{
+			if (ASICharacter* SICharacter = Cast<ASICharacter>(Player->GetPawn()))
+			{
+				SICharacter->RestoreActiveShapeEditForPhaseChange();
+			}
+		}
+	}
+
 	CurrentWorkspaceIndex = 0;
 	StartNextGuessTurn();
 }
@@ -321,6 +373,109 @@ void ASIGameMode::StartNextGuessTurn()
 
 	GetWorldTimerManager().SetTimer(
 		GameTimerHandle, this, &ASIGameMode::EndGuessTurn, GuessTimeLimit, false);
+}
+
+void ASIGameMode::SpawnPlayersToTargetWorkspace(APlayerController* TargetOwner)
+{
+	if (!HasAuthority() || !IsValid(TargetOwner))
+	{
+		return;
+	}
+
+	const TObjectPtr<AActor>* TargetAreaPtr = PlayerWorkspaceAreas.Find(TargetOwner);
+	AActor* TargetArea = TargetAreaPtr ? TargetAreaPtr->Get() : nullptr;
+	if (!IsValid(TargetArea))
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GameMode][GuessSpawn] %s에게 등록된 WorkspaceArea가 없습니다."),
+			*GetNameSafe(TargetOwner));
+		return;
+	}
+
+	TArray<AActor*> ViewingAreaActors;
+	UGameplayStatics::GetAllActorsWithTag(this, GuessViewingAreaTag, ViewingAreaActors);
+	if (ViewingAreaActors.IsEmpty() || !IsValid(ViewingAreaActors[0]))
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GameMode][GuessSpawn] Actor Tag '%s'가 붙은 중앙 관람 기준점을 찾지 못했습니다."),
+			*GuessViewingAreaTag.ToString());
+		return;
+	}
+
+	if (ViewingAreaActors.Num() > 1)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GameMode][GuessSpawn] Actor Tag '%s' 기준점이 %d개입니다. 첫 번째 액터를 사용합니다."),
+			*GuessViewingAreaTag.ToString(), ViewingAreaActors.Num());
+	}
+
+	const AActor* ViewingArea = ViewingAreaActors[0];
+	const FVector CenterLocation = ViewingArea->GetActorLocation();
+	const FVector TargetLocation = TargetArea->GetActorLocation();
+	FVector ViewDirection = TargetLocation - CenterLocation;
+	ViewDirection.Z = 0.0f;
+	ViewDirection = ViewDirection.GetSafeNormal();
+	if (ViewDirection.IsNearlyZero())
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GameMode][GuessSpawn] 중앙 기준점과 목표 WorkspaceArea의 XY 위치가 같습니다."));
+		return;
+	}
+
+	const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, ViewDirection).GetSafeNormal();
+	const FVector FormationAnchor = CenterLocation + ViewDirection * GuessFormationOffsetTowardTarget;
+	const FVector LookAtLocation = TargetLocation + FVector(0.0f, 0.0f, GuessLookAtHeightOffset);
+
+	constexpr int32 PlayersPerRow = 4;
+	int32 ValidPlayerIndex = 0;
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		if (!IsValid(Player) || !IsValid(Player->GetPawn()))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GameMode][GuessSpawn] 이동할 Pawn이 없습니다: %s"),
+				*GetNameSafe(Player));
+			continue;
+		}
+
+		const int32 Row = ValidPlayerIndex / PlayersPerRow;
+		const int32 Column = ValidPlayerIndex % PlayersPerRow;
+		const int32 PlayersBeforeThisRow = Row * PlayersPerRow;
+		const int32 PlayersInThisRow = FMath::Min(
+			PlayersPerRow, PlayerOrderList.Num() - PlayersBeforeThisRow);
+		const float CenteredColumn = static_cast<float>(Column)
+			- static_cast<float>(PlayersInThisRow - 1) * 0.5f;
+
+		const FVector SpawnLocation = FormationAnchor
+			+ RightDirection * (CenteredColumn * GuessPlayerSpacing)
+			- ViewDirection * (static_cast<float>(Row) * GuessRowSpacing);
+		const FRotator FullLookRotation = (LookAtLocation - SpawnLocation).Rotation();
+		const FRotator PawnRotation(0.0f, FullLookRotation.Yaw, 0.0f);
+
+		APawn* Pawn = Player->GetPawn();
+		if (UPawnMovementComponent* MovementComponent = Pawn->GetMovementComponent())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+
+		Pawn->SetActorLocationAndRotation(
+			SpawnLocation,
+			PawnRotation,
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+		// SetControlRotation alone only updates the server-side Controller. For remote
+		// players, force the owning client camera/control rotation through the RPC.
+		Player->SetControlRotation(FullLookRotation);
+		Player->ClientSetRotation(FullLookRotation, true);
+		Pawn->ForceNetUpdate();
+
+		UE_LOG(LogTemp, Log,
+			TEXT("[GameMode][GuessSpawn] %s -> Slot %d, Location=%s, TargetArea=%s"),
+			*GetNameSafe(Player), ValidPlayerIndex, *SpawnLocation.ToCompactString(),
+			*GetNameSafe(TargetArea));
+		++ValidPlayerIndex;
+	}
 }
 
 void ASIGameMode::EndGuessTurn()

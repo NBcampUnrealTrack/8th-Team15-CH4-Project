@@ -17,6 +17,7 @@ class UStaticMeshComponent;
 class UCameraComponent;
 
 struct FInputActionValue;
+enum class ESIGamePhase : uint8;
 
 UCLASS()
 class TEAMPROJECT_API ASICharacter : public ACharacter
@@ -198,6 +199,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Placement|Color")
 	void SetSelectedPaletteColor(int32 ColorIndex, FLinearColor Color);
+
+	void HandleShapeEditingPhaseChanged(ESIGamePhase NewPhase);
+	void RestoreActiveShapeEditForPhaseChange();
 	
 private:
 	// Detail Panel Transform 편집은 기즈모로 이전되어 임시 비활성화한다.
@@ -219,6 +223,16 @@ private:
 	void BeginSelectedCameraFocus();
 	void EndSelectedCameraFocus();
 	bool IsSelectionCameraLocked() const;
+	bool IsShapeEditingAllowed() const;
+	bool IsServerInBuildPhase() const;
+	bool SpawnPlacedShapeOnServer(FName ShapeId, const FTransform& SpawnTransform, uint8 ColorIndex);
+	void ClearServerShapeEditState();
+
+	// 서버가 보관하는 재배치 원본 정보다.
+	bool bHasServerActiveShapeEdit = false;
+	FName ServerEditingOriginalShapeId;
+	FTransform ServerEditingOriginalTransform = FTransform::Identity;
+	uint8 ServerEditingOriginalColorIndex = 0;
 
 	// UFUNCTION()
 	// void HandlePreviewRotationChanged(EAxis::Type Axis, float Value);
