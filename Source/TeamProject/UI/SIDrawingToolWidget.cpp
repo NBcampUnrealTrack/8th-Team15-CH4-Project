@@ -37,6 +37,8 @@ void USIDrawingToolWidget::NativeConstruct()
 	if (Button_Color6) Button_Color6->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor6Clicked);
 	if (Button_Color7) Button_Color7->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor7Clicked);
 	if (Button_Color8) Button_Color8->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor8Clicked);
+	if (Button_Color9) Button_Color9->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor9Clicked);
+	if (Button_Color10) Button_Color10->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor10Clicked);
 }
 
 void USIDrawingToolWidget::NativeDestruct()
@@ -49,6 +51,8 @@ void USIDrawingToolWidget::NativeDestruct()
 	if (Button_Color6) Button_Color6->OnClicked.RemoveDynamic(this, &ThisClass::HandleColor6Clicked);
 	if (Button_Color7) Button_Color7->OnClicked.RemoveDynamic(this, &ThisClass::HandleColor7Clicked);
 	if (Button_Color8) Button_Color8->OnClicked.RemoveDynamic(this, &ThisClass::HandleColor8Clicked);
+	if (Button_Color9) Button_Color9->OnClicked.RemoveDynamic(this, &ThisClass::HandleColor9Clicked);
+	if (Button_Color10) Button_Color10->OnClicked.RemoveDynamic(this, &ThisClass::HandleColor10Clicked);
 
 	Super::NativeDestruct();
 }
@@ -72,4 +76,6 @@ void USIDrawingToolWidget::HandleColor5Clicked() { SelectPaletteColor(4); }
 void USIDrawingToolWidget::HandleColor6Clicked() { SelectPaletteColor(5); }
 void USIDrawingToolWidget::HandleColor7Clicked() { SelectPaletteColor(6); }
 void USIDrawingToolWidget::HandleColor8Clicked() { SelectPaletteColor(7); }
+void USIDrawingToolWidget::HandleColor9Clicked() { SelectPaletteColor(8); }
+void USIDrawingToolWidget::HandleColor10Clicked() { SelectPaletteColor(9); }
 

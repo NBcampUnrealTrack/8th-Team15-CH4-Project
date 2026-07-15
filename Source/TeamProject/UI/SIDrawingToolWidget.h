@@ -58,6 +58,12 @@ private:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Button_Color8;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Color9;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Color10;
+
 	UFUNCTION()
 	void HandleColor1Clicked();
 	UFUNCTION()
@@ -74,4 +80,8 @@ private:
 	void HandleColor7Clicked();
 	UFUNCTION()
 	void HandleColor8Clicked();
+	UFUNCTION()
+	void HandleColor9Clicked();
+	UFUNCTION()
+	void HandleColor10Clicked();
 };
