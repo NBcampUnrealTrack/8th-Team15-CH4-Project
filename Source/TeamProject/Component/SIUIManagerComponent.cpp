@@ -115,7 +115,6 @@ void USIUIManagerComponent::OnWidgetCancelled()
 
 void USIUIManagerComponent::HandleCreateRoomRequested()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[PC] HandleCreateRoom 호출됨"));
 	OnCreateRoomRequested.Broadcast();
 }
 

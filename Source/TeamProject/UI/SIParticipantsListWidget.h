@@ -9,6 +9,7 @@
 class ASIGameState;
 class APlayerState;
 
+class UVerticalBox;
 
 UCLASS()
 class TEAMPROJECT_API USIParticipantsListWidget : public USIUserWidget
@@ -20,14 +21,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Participants")
 	TArray<TObjectPtr<APlayerState>> Participants;
 
-	// 리스트가 갱신될 때 BP에서 UI를 다시 그리도록 오버라이드
-	UFUNCTION(BlueprintImplementableEvent, Category = "Participants")
-	void OnParticipantsRefreshed();
-
-	// 점수 갱신 알림 (BP에서 필요 시 정렬 등)
-	UFUNCTION(BlueprintImplementableEvent, Category = "Participants")
-	void OnParticipantScoreChanged();
-
+private:
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UVerticalBox> VerticalBox_ParticipantsList;
+	
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -38,13 +35,9 @@ private:
 
 	UFUNCTION()
 	void HandlePlayerLeft(APlayerState* LeftPlayer);
-
-	UFUNCTION()
-	void HandleAnyScoreChanged(int32 NewScore);
-
+	
+	void DrawParticipants();
 	void RefreshParticipantsFromGameState();
-	void BindPlayerScoreDelegate(APlayerState* PS);
-	void UnbindPlayerScoreDelegate(APlayerState* PS);
 
 	TWeakObjectPtr<ASIGameState> CachedGameState;
 };

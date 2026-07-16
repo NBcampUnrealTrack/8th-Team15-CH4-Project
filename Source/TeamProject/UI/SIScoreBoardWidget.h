@@ -10,6 +10,7 @@ class ASIGameState;
 class ASIPlayerState;
 class APlayerState;
 
+class UVerticalBox;
 
 UCLASS()
 class TEAMPROJECT_API USIScoreBoardWidget : public USIUserWidget
@@ -25,13 +26,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "ScoreBoard")
 	bool bMatchEnded = false;
 
-	// 매치 종료 시 최종 순위 발표용
-	UFUNCTION(BlueprintImplementableEvent, Category = "ScoreBoard")
-	void OnFinalRankingReady();
 
 private:
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<class UVerticalBox> VerticalBox_Rankings;
+	TObjectPtr<UVerticalBox> VerticalBox_Rankings;
 	
 protected:
 	virtual void NativeConstruct() override;

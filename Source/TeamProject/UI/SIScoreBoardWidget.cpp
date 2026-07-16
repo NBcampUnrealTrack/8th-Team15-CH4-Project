@@ -114,7 +114,6 @@ void USIScoreBoardWidget::HandleMatchEnded()
 {
 	bMatchEnded = true;
 	RefreshSortedPlayers();
-	OnFinalRankingReady();
 }
 
 void USIScoreBoardWidget::RefreshSortedPlayers()

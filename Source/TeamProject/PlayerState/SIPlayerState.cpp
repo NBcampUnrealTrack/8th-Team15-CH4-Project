@@ -78,7 +78,6 @@ void ASIPlayerState::Server_RequestStartGame_Implementation()
 	// 로비에서는 매치를 바로 시작하지 않고 모든 플레이어를 MainLevel로 이동시킵니다.
 	if (ASILobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<ASILobbyGameMode>())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Server] MainLevel로 이동합니다."));
 		LobbyGameMode->RequestStartGame(this);
 		return;
 	}
@@ -86,8 +85,6 @@ void ASIPlayerState::Server_RequestStartGame_Implementation()
 	// MainLevel을 직접 실행해 테스트할 때 사용할 기존 경로입니다.
 	if (ASIGameMode* GameMode = GetWorld()->GetAuthGameMode<ASIGameMode>())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Server] 호스트의 정상적인 요청으로 게임을 시작합니다."));
-
 		// 이전에 개편해 두었던 게임모드의 동시 제작 및 순회 매치 루프를 가동합니다.
 		GameMode->StartGameMatch();
 	}

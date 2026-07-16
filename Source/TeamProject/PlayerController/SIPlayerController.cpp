@@ -62,7 +62,6 @@ void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answ
 		if (GameMode)
 		{
 			GameMode->OnAnswerSubmitted(this, Answer);
-			UE_LOG(LogTemp, Warning, TEXT("[서버] 클라이언트가 제출한 단어 수신: %s"), *Answer);
 		}
 	}
 }
@@ -72,10 +71,6 @@ void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answ
 // ==========================================
 void ASIPlayerController::Client_ReceiveSecretWord_Implementation(const FString& SecretWord)
 {
-	UE_LOG(LogTemp, Warning, TEXT("====================================="));
-	UE_LOG(LogTemp, Warning, TEXT("[클라이언트] 당신의 이번 턴 출제 제시어는 [%s] 입니다!"), *SecretWord);
-	UE_LOG(LogTemp, Warning, TEXT("====================================="));
-	
 	CachedSecretWord = SecretWord;
 	
 	if (HUDWidget)
@@ -89,19 +84,16 @@ void ASIPlayerController::Client_ReceiveSecretWord_Implementation(const FString&
 // ==========================================
 void ASIPlayerController::TestAnswer(const FString& Answer)
 {
-	UE_LOG(LogTemp, Warning, TEXT("콘솔에서 정답 제출 시도 중... 제출 단어: %s"), *Answer);
 	Server_SubmitAnswer(Answer);
 }
 
 void ASIPlayerController::SetPhase(int32 PhaseIndex)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[테스트] 페이즈 변경 명령 전송: %d"), PhaseIndex);
 	Server_TestSetPhase(PhaseIndex);
 }
 
 void ASIPlayerController::SetTime(int32 Seconds)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[테스트] 타이머 변경 명령 전송: %d초"), Seconds);
 	Server_TestSetTime(Seconds);
 }
 
@@ -127,15 +119,12 @@ void ASIPlayerController::Server_TestSetPhase_Implementation(int32 PhaseIndex)
 			{
 			case 1:
 				SIGameState->SetGamePhase(ESIGamePhase::BuildPhase);
-				UE_LOG(LogTemp, Warning, TEXT("[Server] Changed to BuildPhase"));
 				break;
 			case 2:
 				SIGameState->SetGamePhase(ESIGamePhase::GuessPhase);
-				UE_LOG(LogTemp, Warning, TEXT("[Server] Changed to GuessPhase"));
 				break;
 			default:
 				SIGameState->SetGamePhase(ESIGamePhase::None);
-				UE_LOG(LogTemp, Warning, TEXT("[Server] Changed to None"));
 				break;
 			}
 		}
@@ -150,7 +139,6 @@ void ASIPlayerController::Server_TestSetTime_Implementation(int32 Seconds)
 		if (SIGameState)
 		{
 			SIGameState->SetRemainingTime(Seconds);
-			UE_LOG(LogTemp, Warning, TEXT("[Server] Timer set to %d seconds"), Seconds);
 		}
 	}
 }
@@ -283,7 +271,6 @@ void ASIPlayerController::RemovedScoreBoardWidget()
 
 void ASIPlayerController::OpenParticipantsListWidget()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Tab] OpenParticipants called. Phase=%d"), (int32)CurrentPhase);
 	if (CurrentPhase != ESIGamePhase::None && CurrentPhase != ESIGamePhase::ResultPhase)
 	{
 		if (ParticipantsListWidgetClass)
@@ -299,7 +286,6 @@ void ASIPlayerController::OpenParticipantsListWidget()
 
 void ASIPlayerController::CloseParticipantsListWidget()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Tab] Close called!"));
 	if (ParticipantsListWidget)
 	{
 		ParticipantsListWidget->RemoveFromParent();

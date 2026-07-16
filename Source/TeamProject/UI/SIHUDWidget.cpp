@@ -207,9 +207,6 @@ void USIHUDWidget::FocusChatInput()
 
 void USIHUDWidget::HandleChatMessage(const FChatMessagePayload& Payload)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[DEBUG][Chat] HandleChatMessage 수신: ScrollBox=%d, ChatLineClass=%d, Msg='%s'"),
-		IsValid(ScrollBox_ChatLog), (ChatLineWidgetClass != nullptr), *Payload.Message);
-
 	if (!IsValid(ScrollBox_ChatLog) || !ChatLineWidgetClass)
 	{
 		return;
@@ -244,9 +241,6 @@ void USIHUDWidget::HandleScoreUpdated(int32 NewScore)
 
 void USIHUDWidget::HandleChatCommitted(const FText& Chat, ETextCommit::Type CommitMethod)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[DEBUG][Chat] HandleChatCommitted 진입: CommitMethod=%d, Text='%s'"),
-		(int32)CommitMethod, *Chat.ToString());
-
 	if (CommitMethod != ETextCommit::OnEnter) return;
     
 	ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>();
@@ -254,7 +248,6 @@ void USIHUDWidget::HandleChatCommitted(const FText& Chat, ETextCommit::Type Comm
     
 	if (!Message.IsEmpty() && IsValid(PC))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[DEBUG][Chat] Server_SendChat 호출: '%s'"), *Message);
 		PC->Server_SendChat(Message);
 	}
     

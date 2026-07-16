@@ -4,6 +4,9 @@
 #include "GameState/SIGameState.h"
 #include "PlayerState/SIPlayerState.h"
 
+#include "Components/VerticalBox.h"
+#include "Components/TextBlock.h"
+
 void USIParticipantsListWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -19,12 +22,7 @@ void USIParticipantsListWidget::NativeConstruct()
 
 	GS->OnPlayerJoined.AddDynamic(this, &USIParticipantsListWidget::HandlePlayerJoined);
 	GS->OnPlayerLeft.AddDynamic(this, &USIParticipantsListWidget::HandlePlayerLeft);
-
-	for (APlayerState* PS : GS->PlayerArray)
-	{
-		BindPlayerScoreDelegate(PS);
-	}
-
+	
 	RefreshParticipantsFromGameState();
 }
 
@@ -34,11 +32,6 @@ void USIParticipantsListWidget::NativeDestruct()
 	{
 		CachedGameState->OnPlayerJoined.RemoveDynamic(this, &USIParticipantsListWidget::HandlePlayerJoined);
 		CachedGameState->OnPlayerLeft.RemoveDynamic(this, &USIParticipantsListWidget::HandlePlayerLeft);
-
-		for (APlayerState* PS : CachedGameState->PlayerArray)
-		{
-			UnbindPlayerScoreDelegate(PS);
-		}
 	}
 
 	Super::NativeDestruct();
@@ -46,27 +39,52 @@ void USIParticipantsListWidget::NativeDestruct()
 
 void USIParticipantsListWidget::HandlePlayerJoined(APlayerState* JoinedPlayer)
 {
-	if (JoinedPlayer && !Participants.Contains(JoinedPlayer))
-	{
-		Participants.Add(JoinedPlayer);
-		BindPlayerScoreDelegate(JoinedPlayer);
-		OnParticipantsRefreshed();
-	}
+	RefreshParticipantsFromGameState();
 }
 
 void USIParticipantsListWidget::HandlePlayerLeft(APlayerState* LeftPlayer)
 {
-	if (LeftPlayer)
-	{
-		UnbindPlayerScoreDelegate(LeftPlayer);
-		Participants.Remove(LeftPlayer);
-		OnParticipantsRefreshed();
-	}
+	RefreshParticipantsFromGameState();
 }
 
-void USIParticipantsListWidget::HandleAnyScoreChanged(int32 NewScore)
+void USIParticipantsListWidget::DrawParticipants()
 {
-	OnParticipantScoreChanged();
+	if (!IsValid(VerticalBox_ParticipantsList))
+	{
+		return;
+	}
+	
+	const int slotcount = VerticalBox_ParticipantsList->GetChildrenCount();
+	
+	for (int i = 0; i < slotcount; ++i)
+	{
+		UTextBlock* RawText = Cast<UTextBlock>(VerticalBox_ParticipantsList->GetChildAt(i));
+		if (!RawText)
+		{
+			continue;
+		}
+		
+		if (i < Participants.Num())
+		{
+			const FString PlayerName = Participants[i]->GetPlayerName();
+			
+			FString Line = FString::Printf(TEXT("%s"), *PlayerName);
+			
+			ASIPlayerState* PS  = Cast<ASIPlayerState>(Participants[i]);
+			
+			if (PS && PS->bIsHost)
+			{
+				Line += TEXT(" (방장)");
+			}
+			
+			RawText->SetText(FText::FromString(Line));
+			RawText->SetVisibility(ESlateVisibility::Visible);
+		}
+		else
+		{
+			RawText->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 }
 
 void USIParticipantsListWidget::RefreshParticipantsFromGameState()
@@ -84,22 +102,5 @@ void USIParticipantsListWidget::RefreshParticipantsFromGameState()
 			Participants.Add(PS);
 		}
 	}
-
-	OnParticipantsRefreshed();
-}
-
-void USIParticipantsListWidget::BindPlayerScoreDelegate(APlayerState* PS)
-{
-	if (ASIPlayerState* SIPS = Cast<ASIPlayerState>(PS))
-	{
-		SIPS->OnScoreUpdated.AddDynamic(this, &USIParticipantsListWidget::HandleAnyScoreChanged);
-	}
-}
-
-void USIParticipantsListWidget::UnbindPlayerScoreDelegate(APlayerState* PS)
-{
-	if (ASIPlayerState* SIPS = Cast<ASIPlayerState>(PS))
-	{
-		SIPS->OnScoreUpdated.RemoveDynamic(this, &USIParticipantsListWidget::HandleAnyScoreChanged);
-	}
+	DrawParticipants();
 }

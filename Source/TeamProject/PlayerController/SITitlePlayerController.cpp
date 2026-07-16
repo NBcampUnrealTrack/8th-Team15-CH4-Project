@@ -82,5 +82,4 @@ void ASITitlePlayerController::HandleQuit()
 void ASITitlePlayerController::OnCreateRoomClicked()
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
-	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));
 }
