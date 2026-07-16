@@ -1,7 +1,9 @@
 #include "SILobbyGameMode.h"
 
 #include "GameInstance/SIGameInstance.h"
+#include "GameInstance/SISessionSubsystem.h"
 #include "GameState/SIGameState.h"
+#include "Kismet/GameplayStatics.h"
 #include "PlayerState/SIPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -33,6 +35,54 @@ ASILobbyGameMode::ASILobbyGameMode()
 	if (DefaultPawnFinder.Succeeded())
 	{
 		DefaultPawnClass = DefaultPawnFinder.Class;
+	}
+}
+
+void ASILobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId,
+	FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	
+	// Super가 이미 거절 사유를 채웠으면 그대로 존중
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+	
+	// 호스트가 보관 중인 방 설정 조회 (서버에서만 실행되므로 호스트의 서브시스템)
+	const UGameInstance* GameIstance = GetGameInstance();
+	
+	// 게임 인스턴스 없으면 검증 불가 — 일단 통과 (개발 편의)
+	if (IsValid(GameIstance) == false)
+	{
+		return;
+	}
+	
+	const USISessionSubsystem* Subsystem = GameIstance->GetSubsystem<USISessionSubsystem>();
+	
+	// 서브시스템 없으면 검증 불가 — 일단 통과 (개발 편의)
+	if (IsValid(Subsystem) == false)
+	{
+		return;   
+	}
+
+	const FSICreateSessionParams& HostParams = Subsystem->GetHostSessionParams();
+	
+	// 공개 방 — 검증 없음
+	if (!HostParams.bIsPrivate)
+	{
+		return;   
+	}
+
+	// 클라이언트가 URL에 실어 보낸 값 추출
+	const FString ClientPassword = UGameplayStatics::ParseOption(Options, TEXT("Password"));
+
+	if (ClientPassword != HostParams.Password)
+	{
+		// 채우는 순간 접속 거절
+		ErrorMessage = TEXT("Incorrect password");   
+		
+		UE_LOG(LogTemp, Warning, TEXT("[Lobby] PreLogin rejected: wrong password from %s"), *Address);
 	}
 }
 

@@ -9,15 +9,18 @@ public class TeamProject : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
 		PublicDependencyModuleNames.AddRange(new string[] { 
-            "Core", 
-            "CoreUObject", 
-            "Engine", 
-            "InputCore", 
-            "EnhancedInput",
-            "UMG",
-            "Slate",
-            "SlateCore"
+			// Default
+			"Core", "CoreUObject", "Engine", 
+			// Input
+			"InputCore", "EnhancedInput", 
+			// UI
+			"UMG", "Slate", "SlateCore",
+			// Online
+			"OnlineSubsystem", "OnlineSubsystemUtils",
         });
+		
+		// Null Subsystem Module
+		DynamicallyLoadedModuleNames.Add("OnlineSubsystemNull");
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
             "InteractiveToolsFramework"
