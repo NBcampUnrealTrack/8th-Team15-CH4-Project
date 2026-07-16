@@ -95,6 +95,8 @@ private:
 	FTimerHandle UITimerTickHandle;
 
 	int32 CurrentWorkspaceIndex = -1;
+	
+	void ApplyHostMatchSettings();
 
 	bool AssignWordsToPlayers();
 	void TryStartPendingMatch();

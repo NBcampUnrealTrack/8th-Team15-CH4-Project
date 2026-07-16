@@ -25,6 +25,14 @@ struct FSICreateSessionParams
 	/** 광고하지 않음 — 호스트 측 검증용으로만 보관 */
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
 	FString Password;
+	
+	/** 그리기 제한 시간(초). 0 이하 = GameMode 기본값 사용 */
+	UPROPERTY(BlueprintReadWrite, Category = "Session")
+	float BuildTime = 0.0f;
+
+	/** 정답 제한 시간(초). 0 이하 = GameMode 기본값 사용 */
+	UPROPERTY(BlueprintReadWrite, Category = "Session")
+	float GuessTime = 0.0f;
 };
 
 /** BP로 내보낼 검색 결과 요약 (FOnlineSessionSearchResult는 USTRUCT가 아니라 직접 노출 불가) */

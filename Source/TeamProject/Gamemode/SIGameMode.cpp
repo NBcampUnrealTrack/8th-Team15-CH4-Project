@@ -11,6 +11,7 @@
 #include "PlayerController/SIPlayerController.h"
 #include "PlayerState/SIPlayerState.h"
 #include "TimerManager.h"
+#include "GameInstance/SISessionSubsystem.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/UnrealType.h"
 
@@ -268,6 +269,9 @@ void ASIGameMode::StartGameMatch()
 	{
 		return;
 	}
+	
+	// ★ 방 설정 반영 (이후의 BuildTimeLimit/GuessTimeLimit 사용처가 전부 이 값을 씀)
+	ApplyHostMatchSettings();   
 
 	if (!AssignWordsToPlayers())
 	{
@@ -312,6 +316,32 @@ void ASIGameMode::StartGameMatch()
 		GameTimerHandle, this, &ASIGameMode::EndBuildPhase, BuildTimeLimit, false);
 	GetWorldTimerManager().SetTimer(
 		UITimerTickHandle, this, &ASIGameMode::OnUITimerTick, 1.0f, true);
+}
+
+void ASIGameMode::ApplyHostMatchSettings()
+{
+	const UGameInstance* GameInstance = GetGameInstance();
+	const USISessionSubsystem* Subsystem =
+		GameInstance ? GameInstance->GetSubsystem<USISessionSubsystem>() : nullptr;
+	if (!Subsystem)
+	{
+		return;   // 서브시스템 없으면 기본값 유지
+	}
+
+	const FSICreateSessionParams& HostParams = Subsystem->GetHostSessionParams();
+
+	// 센티널(0 이하) = 미지정 → 기본값 유지. 지정됐어도 서버가 상식 범위로 clamp
+	if (HostParams.BuildTime > 0.0f)
+	{
+		BuildTimeLimit = FMath::Clamp(HostParams.BuildTime, 30.0f, 600.0f);
+	}
+	if (HostParams.GuessTime > 0.0f)
+	{
+		GuessTimeLimit = FMath::Clamp(HostParams.GuessTime, 10.0f, 120.0f);
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[GameMode] Match settings: Build=%.0fs, Guess=%.0fs"),
+		BuildTimeLimit, GuessTimeLimit);
 }
 
 void ASIGameMode::OnUITimerTick()
