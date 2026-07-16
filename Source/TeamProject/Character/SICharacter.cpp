@@ -29,8 +29,8 @@
 
 namespace
 {
-	constexpr float MinGizmoPreviewScale = 0.65f;
-	constexpr float MaxGizmoPreviewScale = 1.35f;
+	constexpr float MinGizmoPreviewScale = 0.30f;
+	constexpr float MaxGizmoPreviewScale = 1.70f;
 
 	/* Detail Panel의 Rotation/Scale 편집은 기즈모로 이전되어 임시 비활성화한다.
 	constexpr float PreviewRotationRangeDegrees = 180.0f;
@@ -197,6 +197,11 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		if (PlayerCharacterInputConfig->RebaseMode)
 		{
 			EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->RebaseMode, ETriggerEvent::Started, this, &ThisClass::ToggleRebaseMode);
+		}
+
+		if (PlayerCharacterInputConfig->CopyMode)
+		{
+			EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->CopyMode, ETriggerEvent::Started, this, &ThisClass::ToggleCopyMode);
 		}
 	}
 }
@@ -440,9 +445,10 @@ void ASICharacter::ConfirmPlacement()
 	{
 		// 설치는 서버에서 확정
 		Server_RequestSpawnShape(CurrentPreviewShapeId, PreviewActor->GetActorTransform(), CurrentPreviewColorIndex);
-		if (ObjectEditState == EObjectEditState::Preview && !bIsEditingExistingShape)
+		if ((ObjectEditState == EObjectEditState::Preview || ObjectEditState == EObjectEditState::Copy)
+			&& !bIsEditingExistingShape)
 		{
-			// 일반 프리뷰는 유지하여 같은 도형을 연속으로 설치한다.
+			// 일반 프리뷰와 복사 모드는 유지하여 같은 도형을 연속으로 설치한다.
 			UpdatePreviewTransform();
 			return;
 		}
@@ -457,6 +463,16 @@ void ASICharacter::ConfirmPlacement()
 
 void ASICharacter::CancelPreview()
 {
+	if (ObjectEditState == EObjectEditState::Copy)
+	{
+		if (bIsUIOnlyMode)
+		{
+			ToggleUIOnlyMode();
+		}
+		ClearPreview();
+		return;
+	}
+
 	if (bIsUIOnlyMode)
 	{
 		// UI 모드에서는 프리뷰를 취소하지 않고 Play 모드로만 돌아간다.
@@ -520,9 +536,10 @@ void ASICharacter::ResetPreviewTransform()
 		return;
 	}
 
-	//선택 상태일 시 도형 삭제
+	// 선택 상태에서는 서버가 보관 중인 편집 정보를 삭제로 확정한다.
 	if (bIsEditingExistingShape)
 	{
+		Server_RequestDeleteEditedShape();
 		ClearPreview();
 		return;
 	}
@@ -572,7 +589,8 @@ void ASICharacter::UpdateShapePanelAvailability()
 	if (ShapePanel)
 	{
 		const bool bCanSelectShape = ObjectEditState != EObjectEditState::Selected
-			&& ObjectEditState != EObjectEditState::Rebase;
+			&& ObjectEditState != EObjectEditState::Rebase
+			&& ObjectEditState != EObjectEditState::Copy;
 		ShapePanel->SetIsEnabled(bCanSelectShape);
 	}
 }
@@ -585,7 +603,9 @@ void ASICharacter::StartShapePreview(FName ShapeId)
 		return;
 	}
 
-	if (ObjectEditState == EObjectEditState::Selected || ObjectEditState == EObjectEditState::Rebase)
+	if (ObjectEditState == EObjectEditState::Selected
+		|| ObjectEditState == EObjectEditState::Rebase
+		|| ObjectEditState == EObjectEditState::Copy)
 	{
 		return;
 	}
@@ -1054,6 +1074,55 @@ void ASICharacter::ToggleRebaseMode()
 	}
 }
 
+void ASICharacter::ToggleCopyMode()
+{
+	if (ObjectEditState == EObjectEditState::Copy)
+	{
+		if (bIsUIOnlyMode)
+		{
+			ToggleUIOnlyMode();
+		}
+		ClearPreview();
+		return;
+	}
+
+	// 복사는 설치된 도형을 선택한 상태에서만 시작할 수 있다.
+	if (!IsShapeEditingAllowed()
+		|| ObjectEditState != EObjectEditState::Selected
+		|| !PreviewActor
+		|| !bIsEditingExistingShape
+		|| CurrentPreviewShapeId.IsNone())
+	{
+		return;
+	}
+
+	const FTransform SourceTransform = PreviewActor->GetActorTransform();
+	PreviewRotation = SourceTransform.GetRotation().Rotator();
+	PreviewScale = SourceTransform.GetScale3D();
+
+	// 선택 중인 값을 원본 도형으로 확정하고 같은 값을 복사 프리뷰에 유지한다.
+	Server_RequestSpawnShape(CurrentPreviewShapeId, SourceTransform, CurrentPreviewColorIndex);
+
+	if (bIsUIOnlyMode)
+	{
+		ToggleUIOnlyMode();
+	}
+
+	EndSelectedCameraFocus();
+	bIsEditingExistingShape = false;
+	EditingOriginalShapeId = NAME_None;
+	EditingOriginalTransform = FTransform::Identity;
+	EditingOriginalColorIndex = 0;
+	EditingOriginalColor = FLinearColor::White;
+	ObjectEditState = EObjectEditState::Copy;
+	UpdateShapePanelAvailability();
+
+	// 복사 프리뷰는 에임 중앙을 따라가며 회전과 스케일 기즈모만 사용한다.
+	UpdatePreviewTransform();
+	StartPreviewGizmo(false);
+	SetObjectGizmoInputMode(false);
+}
+
 void ASICharacter::StartPreviewGizmo(bool bEnableLocation)
 {
 	if (PreviewTransformGizmoComponent && PreviewActor)
@@ -1388,6 +1457,17 @@ void ASICharacter::Server_RequestEditShape_Implementation(APlacedShapeActor* Tar
 	TargetShape->Destroy();
 
 	Client_StartEditShape(ShapeId, PreviewTransform, ColorIndex, ShapeColor);
+}
+
+void ASICharacter::Server_RequestDeleteEditedShape_Implementation()
+{
+	if (!IsServerInBuildPhase() || !bHasServerActiveShapeEdit)
+	{
+		return;
+	}
+
+	// 선택 시작 시 원본 액터는 이미 제거됐으므로 서버 편집 상태를 비우면 삭제가 확정된다.
+	ClearServerShapeEditState();
 }
 
 // 클라이언트에서 편집 프리뷰를 시작한다.

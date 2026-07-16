@@ -50,6 +50,9 @@ public:
 	TObjectPtr<UInputAction> RebaseMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> CopyMode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UInputAction> Participants;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

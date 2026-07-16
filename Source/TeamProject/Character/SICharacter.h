@@ -134,7 +134,8 @@ private:
 		None,
 		Preview,
 		Selected,
-		Rebase
+		Rebase,
+		Copy
 	};
 	
 protected:
@@ -216,6 +217,7 @@ private:
 	void HandlePrimaryActionStarted();
 	void HandlePrimaryActionCompleted();
 	void ToggleRebaseMode();
+	void ToggleCopyMode();
 	void StartPreviewGizmo(bool bEnableLocation);
 	void SetObjectGizmoInputMode(bool bEnable);
 	void HandlePreviewGizmoTransformChanged(const FTransform& NewTransform);
@@ -245,6 +247,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void Server_RequestEditShape(APlacedShapeActor* TargetShape);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestDeleteEditedShape();
 
 	UFUNCTION(Client, Reliable)
 	void Client_StartEditShape(FName ShapeId, FTransform PreviewTransform, uint8 ColorIndex, FLinearColor Color);
