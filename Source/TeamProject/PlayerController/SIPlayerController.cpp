@@ -20,7 +20,8 @@
 
 ASIPlayerController::ASIPlayerController()
 {
-
+	BGMAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("BGMAudioComponent"));
+	BGMAudioComponent->bAutoActivate = false;
 }
 
 void ASIPlayerController::BeginPlay()
@@ -29,6 +30,12 @@ void ASIPlayerController::BeginPlay()
 	
 	if (IsLocalController())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("=== [DEBUG] PC BeginPlay Started ==="));
+		
+		//레벨에 따른 BGM 초기화
+		FTimerHandle TimerHandle;
+		GetWorldTimerManager().SetTimer(TimerHandle, this, &ASIPlayerController::InitializeLevelBGM, 0.5f, false);
+		
 		TryCacheGameState();
 	}
 }
@@ -45,6 +52,11 @@ void ASIPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		GetWorld()->GetTimerManager().ClearTimer(GameStateRetryHandle);
 	}
 	
+	//사운드 재생 제거
+	if (BGMAudioComponent)
+	{
+		BGMAudioComponent->Stop();
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -325,6 +337,10 @@ void ASIPlayerController::CloseAllPhaseWidgets()
 void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
+	
+	//사운드 파라미터 업데이트 함수
+	UpdateBGMParameters(NewPhase);
+	
 	CloseAllPhaseWidgets();
 
 	if (ASICharacter* SICharacter = Cast<ASICharacter>(GetPawn()))
@@ -436,4 +452,88 @@ void ASIPlayerController::CloseLobbySettingWidget()
 	LobbySettingWidget->RemoveFromParent();
 }
 
+
 #pragma endregion
+
+#pragma region Sound
+
+void ASIPlayerController::UpdateBGMParameters(ESIGamePhase NewPhase)
+{
+	//지금 재생 중인 사운드가 메타 사운드 일때만 파라미터 업데이트 하도록 하였음
+	if (!BGMAudioComponent || !BGMAudioComponent->IsPlaying()) return;
+	if (BGMAudioComponent->GetSound() != BGMMetaSound) return;
+ 
+	float PhaseValue = 0.0f;
+ 
+	switch (NewPhase)
+	{
+	case ESIGamePhase::BuildPhase:
+		PhaseValue = 0.0f; // 작업 음악 (In 0)
+		break;
+	case ESIGamePhase::GuessPhase:
+		PhaseValue = 1.0f; // 정답 음악 (In 1)
+		break;
+	default:
+		// 다른 페이즈일 때의 기본값 설정
+		PhaseValue = 0.0f; 
+		break;
+	}
+	
+	//메타 사운드 내부 phase 파라미터 값 업데이트
+	BGMAudioComponent->SetFloatParameter(FName("Phase"), PhaseValue);
+}
+
+void ASIPlayerController::InitializeLevelBGM()
+{
+	if (!IsValid(BGMAudioComponent))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("BGMAudioComponent was NULL. Creating it at runtime as a fallback."));
+		return; 
+	}
+	
+	BGMAudioComponent = NewObject<UAudioComponent>(this, TEXT("RuntimeBGMAudioComponent"));
+	
+	if (BGMAudioComponent)
+	{
+		BGMAudioComponent->RegisterComponent(); // 런타임 생성 시 필수 호출
+		BGMAudioComponent->bAutoActivate = false;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to create BGMAudioComponent at runtime!"));
+		return;
+	}
+	
+	if (!IsValid(BGMMetaSound))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("BGM Warning: BGMMetaSound is not assigned in Blueprint."));
+		return;
+	}
+	
+	//현재 레벨 이름 가져오기
+	FString MapName = UGameplayStatics::GetCurrentLevelName(GetWorld());
+	
+	UE_LOG(LogTemp, Warning, TEXT("Current Map Name: [%s]"), *MapName);
+	
+	USoundBase* SoundToPlay = nullptr;
+	
+	//레벨에 따라 사운드 재생
+	if (MapName.Contains(TEXT("Test_Lobby")))
+	{
+		SoundToPlay = LobbyBGM;
+	}
+	else if (MapName.Contains(TEXT("MainLevel")))
+	{
+		SoundToPlay = BGMMetaSound;
+	}	
+	
+	//사운드 교체 및 실행
+	if (IsValid(SoundToPlay))
+	{
+		BGMAudioComponent->Stop(); 
+		BGMAudioComponent->SetSound(SoundToPlay);
+		BGMAudioComponent->Play();
+	}
+}
+
+#pragma endregion 

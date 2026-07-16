@@ -12,6 +12,9 @@
 ASITitlePlayerController::ASITitlePlayerController()
 {
 	UIManagerComponent = CreateDefaultSubobject<USIUIManagerComponent>(TEXT("UIManagerComponent"));
+	
+	BGMAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("BGMAudioComponent"));
+	BGMAudioComponent->bAutoActivate = false;
 }
 
 void ASITitlePlayerController::ReceivedPlayer()
@@ -23,6 +26,14 @@ void ASITitlePlayerController::ReceivedPlayer()
 
 	FInputModeGameAndUI InputMode;
 	SetInputMode(InputMode);
+	
+	if (IsLocalController())
+	{
+		// 0.2초 뒤에 메인메뉴 음악 실행 (안전장치)
+		FTimerHandle TimerHandle;
+		GetWorldTimerManager().SetTimer(TimerHandle, this, &ASITitlePlayerController::InitializeMainMenuBGM, 0.2f, false);
+		
+	}
 
 	if (!IsLocalController())
 	{
@@ -82,4 +93,19 @@ void ASITitlePlayerController::HandleQuit()
 void ASITitlePlayerController::OnCreateRoomClicked()
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
+	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));
 }
+#pragma region Sound
+
+void ASITitlePlayerController::InitializeMainMenuBGM()
+{
+	// 크래시 방지: IsValid 체크 필수
+	if (IsValid(BGMAudioComponent) && IsValid(MainMenuBGM))
+	{
+		BGMAudioComponent->SetSound(MainMenuBGM);
+		BGMAudioComponent->Play();
+		UE_LOG(LogTemp, Warning, TEXT("Title BGM Started!"));
+	}
+}
+
+#pragma endregion

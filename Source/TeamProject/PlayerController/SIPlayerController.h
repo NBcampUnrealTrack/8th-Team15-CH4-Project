@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Component/SIUIManagerComponent.h"
 #include "Enums/SITypes.h"
+#include "Components/AudioComponent.h"
 #include "SIPlayerController.generated.h"
 
 class ASIGameState;
@@ -16,7 +17,7 @@ class USIDrawingToolWidget;
 class USIMainMenuWidget;
 class USILobbySettingWidget;
 class USIHUDWidget;
-
+class UAudioComponent;
 class UInputAction;
 class USoundBase;
 
@@ -190,6 +191,20 @@ private:
 	
 	UPROPERTY(EditAnywhere, Category = "UI|Sound")
 	TObjectPtr<USoundBase> TabCloseSound;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Sound")
+	TObjectPtr<UAudioComponent> BGMAudioComponent;
+	
+
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> BGMMetaSound;
+	
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> LobbyBGM;
+	
+	void UpdateBGMParameters(ESIGamePhase NewPhase);
+	
+	void InitializeLevelBGM();
 	
 #pragma endregion
 };
