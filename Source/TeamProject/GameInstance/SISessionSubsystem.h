@@ -91,14 +91,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SI|Session")
     void CreateSession(const FSICreateSessionParams& Params);
 
-	UFUNCTION(BlueprintCallable, Category = "NS|Session")
+	UFUNCTION(BlueprintCallable, Category = "SI|Session")
 	void FindSessions(int32 MaxSearchResults = 20);
 
 	UFUNCTION(BlueprintCallable, Category = "SI|Session")
 	void JoinSessionByIndex(int32 SearchResultIndex, const FString& Password = TEXT(""));
 
-	UFUNCTION(BlueprintCallable, Category = "NS|Session")
+	UFUNCTION(BlueprintCallable, Category = "SI|Session")
 	void DestroySession();
+
+	/** 현재 세션에서 나간다. 정리 완료 후 OnDestroySessionCompleteEvent 방송 →
+		구독자(UI/레벨)가 메인메뉴 복귀를 실행 */
+	UFUNCTION(BlueprintCallable, Category = "SI|Session")
+	void LeaveSession();
 	
 	/** PreLogin 검증용 — LobbyGameMode가 읽어감 */
 	UFUNCTION(BlueprintCallable, Category = "SI|Session")
@@ -106,16 +111,16 @@ public:
 
 	
 	/** ── UI가 구독하는 방송 채널 ── */
-	UPROPERTY(BlueprintAssignable, Category = "NS|Session")
+	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
 	FSIOnCreateSessionComplete OnCreateSessionCompleteEvent;
 
-	UPROPERTY(BlueprintAssignable, Category = "NS|Session")
+	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
 	FSIOnDestroySessionComplete OnDestroySessionCompleteEvent;
 
-	UPROPERTY(BlueprintAssignable, Category = "NS|Session")
+	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
 	FSIOnFindSessionsComplete OnFindSessionsCompleteEvent;
 
-	UPROPERTY(BlueprintAssignable, Category = "NS|Session")
+	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
 	FSIOnJoinSessionComplete OnJoinSessionCompleteEvent;
 
 	/** 접속 실패/추방 통지 — UI가 "비밀번호가 틀렸습니다" 등을 띄우는 데 사용 */
@@ -156,6 +161,9 @@ private:
 	
 	/** Join 시에 입력된 Password 입력값 보관 */
 	FString PendingJoinPassword;
+
+	// Destroy 완료 후 복귀 예약 플래그
+	bool bReturnToMainMenuOnDestroy = false;   
 	
 #pragma endregion
 };

@@ -5,6 +5,7 @@
 
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystemUtils.h"
+#include "Kismet/GameplayStatics.h"
 #include "Online/OnlineSessionNames.h"
 
 // 커스텀 세션 데이터 키 — 오타 방지를 위해 상수로 한 곳에
@@ -325,6 +326,26 @@ void USISessionSubsystem::DestroySession()
 	}
 }
 
+void USISessionSubsystem::LeaveSession()
+{
+	if (!EnsureSessionInterface())
+	{
+		OnDestroySessionCompleteEvent.Broadcast(false);
+		return;
+	}
+
+	// 세션이 없는데 눌렀으면 그냥 "나간 것"으로 처리 (방어)
+	if (!SessionInterface->GetNamedSession(NAME_GameSession))
+	{
+		PrintNS(TEXT("LeaveSession: no session to leave"));
+		OnDestroySessionCompleteEvent.Broadcast(true);
+		return;
+	}
+
+	bReturnToMainMenuOnDestroy = true;
+	DestroySession();   // 기존 Destroy 경로 재사용 — 완료는 OnDestroySessionComplete로
+}
+
 void USISessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
 	SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
@@ -337,6 +358,13 @@ void USISessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasS
 	{
 		bCreateSessionOnDestroy = false;
 		CreateSessionInternal();
+	}
+	
+	// LeaveSession 경로였다면 메인메뉴로 복귀
+	if (bReturnToMainMenuOnDestroy)
+	{
+		bReturnToMainMenuOnDestroy = false;
+		UGameplayStatics::OpenLevel(GetWorld(), FName("MainMenu"));   // listen 옵션 없음 — 혼자 노는 맵
 	}
 }
 
@@ -352,7 +380,12 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 	// 실패한 접속이 남긴 로컬 세션 정리 → 재시도 가능 상태 복구
 	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
 	{
+		bReturnToMainMenuOnDestroy = true;    // ★ 정리 후 메인메뉴 복귀 예약
 		DestroySession();
+	}
+	else
+	{
+		UGameplayStatics::OpenLevel(GetWorld(), FName("MainMenu"));   // 정리할 세션이 없으면 즉시 복귀
 	}
 
 	OnNetworkFailureEvent.Broadcast(false); 
