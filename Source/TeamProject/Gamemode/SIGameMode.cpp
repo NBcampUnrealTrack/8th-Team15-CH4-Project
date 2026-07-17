@@ -34,6 +34,20 @@ namespace
 			|| DisplayName.Equals(TEXT("Keyword"), ESearchCase::IgnoreCase);
 	}
 
+	bool IsLevelProperty(const FProperty* Property)
+	{
+		if (!Property)
+		{
+			return false;
+		}
+
+		const FString PropertyName = Property->GetName();
+		const FString DisplayName = Property->GetDisplayNameText().ToString();
+		return PropertyName.Equals(TEXT("Level"), ESearchCase::IgnoreCase)
+			|| PropertyName.StartsWith(TEXT("Level_"), ESearchCase::IgnoreCase)
+			|| DisplayName.Equals(TEXT("Level"), ESearchCase::IgnoreCase);
+	}
+
 	FString ReadKeywordValue(const FProperty* Property, const uint8* RowData)
 	{
 		if (const FStrProperty* StringProperty = CastField<FStrProperty>(Property))
@@ -53,10 +67,29 @@ namespace
 
 		return FString();
 	}
+
+	bool ReadLevelValue(const FProperty* Property, const uint8* RowData, int32& OutLevel)
+	{
+		if (!Property || !RowData)
+		{
+			return false;
+		}
+
+		FString ExportedValue;
+		const void* ValuePtr = Property->ContainerPtrToValuePtr<void>(RowData);
+		Property->ExportTextItem_Direct(
+			ExportedValue, ValuePtr, nullptr, nullptr, PPF_None);
+		ExportedValue = ExportedValue.TrimStartAndEnd().TrimQuotes();
+		return LexTryParseString(OutLevel, *ExportedValue);
+	}
 }
 
 ASIGameMode::ASIGameMode()
 {
+	CreatorFirstCorrectScoresByLevel.Add(1, 1);
+	CreatorFirstCorrectScoresByLevel.Add(2, 2);
+	CreatorFirstCorrectScoresByLevel.Add(3, 3);
+
 	static ConstructorHelpers::FObjectFinder<UDataTable> KeywordTableFinder(
 		TEXT("/Game/Shape_It/Game/Keyword.Keyword"));
 	if (KeywordTableFinder.Succeeded())
@@ -200,31 +233,48 @@ bool ASIGameMode::AssignWordsToPlayers()
 	}
 
 	const FProperty* KeywordProperty = nullptr;
+	const FProperty* LevelProperty = nullptr;
 	for (TFieldIterator<FProperty> PropertyIt(KeywordDataTable->GetRowStruct()); PropertyIt; ++PropertyIt)
 	{
 		if (IsKeywordProperty(*PropertyIt))
 		{
 			KeywordProperty = *PropertyIt;
-			break;
+		}
+		else if (IsLevelProperty(*PropertyIt))
+		{
+			LevelProperty = *PropertyIt;
 		}
 	}
 
-	if (!KeywordProperty)
+	if (!KeywordProperty || !LevelProperty)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[GameMode] DataTable Row에서 Keyword 필드를 찾지 못했습니다."));
+		UE_LOG(LogTemp, Error,
+			TEXT("[GameMode] Keyword DataTable Row에서 Keyword 또는 Level 필드를 찾지 못했습니다."));
 		return false;
 	}
 
-	TArray<FString> CandidateWords;
+	TArray<FSIAssignedKeyword> CandidateWords;
 	TSet<FString> UniqueWords;
 	for (const TPair<FName, uint8*>& RowPair : KeywordDataTable->GetRowMap())
 	{
 		FString Word = ReadKeywordValue(KeywordProperty, RowPair.Value).TrimStartAndEnd();
+		int32 Level = 0;
+		if (!ReadLevelValue(LevelProperty, RowPair.Value, Level) || Level <= 0)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GameMode] Keyword DataTable의 '%s' 행에 유효한 Level이 없습니다."),
+				*RowPair.Key.ToString());
+			continue;
+		}
+
 		const FString ComparisonKey = Word.ToLower();
 		if (!Word.IsEmpty() && !UniqueWords.Contains(ComparisonKey))
 		{
 			UniqueWords.Add(ComparisonKey);
-			CandidateWords.Add(MoveTemp(Word));
+			FSIAssignedKeyword Candidate;
+			Candidate.Keyword = MoveTemp(Word);
+			Candidate.Level = Level;
+			CandidateWords.Add(MoveTemp(Candidate));
 		}
 	}
 
@@ -294,12 +344,12 @@ void ASIGameMode::StartGameMatch()
 
 	for (APlayerController* Player : PlayerOrderList)
 	{
-		const FString* AssignedWord = PlayerAssignedWords.Find(Player);
-		if (AssignedWord)
+		const FSIAssignedKeyword* AssignedKeyword = PlayerAssignedWords.Find(Player);
+		if (AssignedKeyword)
 		{
 			if (ASIPlayerController* SIPlayer = Cast<ASIPlayerController>(Player))
 			{
-				SIPlayer->Client_ReceiveSecretWord(*AssignedWord);
+				SIPlayer->Client_ReceiveSecretWord(AssignedKeyword->Keyword);
 			}
 		}
 	}
@@ -342,6 +392,26 @@ void ASIGameMode::ApplyHostMatchSettings()
 
 	UE_LOG(LogTemp, Log, TEXT("[GameMode] Match settings: Build=%.0fs, Guess=%.0fs"),
 		BuildTimeLimit, GuessTimeLimit);
+}
+
+int32 ASIGameMode::GetCreatorScoreForCorrectAnswer(
+	const int32 KeywordLevel, const bool bIsFirstCorrect) const
+{
+	if (!bIsFirstCorrect)
+	{
+		return FMath::Max(CreatorAdditionalCorrectScore, 0);
+	}
+
+	const int32* LevelScore = CreatorFirstCorrectScoresByLevel.Find(KeywordLevel);
+	if (!LevelScore)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GameMode] Level %d의 최초 정답 제작자 점수가 설정되지 않았습니다."),
+			KeywordLevel);
+		return 0;
+	}
+
+	return FMath::Max(*LevelScore, 0);
 }
 
 void ASIGameMode::OnUITimerTick()
@@ -552,8 +622,8 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 	}
 
 	APlayerController* WorkspaceOwner = PlayerOrderList[CurrentWorkspaceIndex];
-	const FString* CorrectAnswer = PlayerAssignedWords.Find(WorkspaceOwner);
-	if (!IsValid(WorkspaceOwner) || !CorrectAnswer)
+	const FSIAssignedKeyword* AssignedKeyword = PlayerAssignedWords.Find(WorkspaceOwner);
+	if (!IsValid(WorkspaceOwner) || !AssignedKeyword)
 	{
 		return;
 	}
@@ -568,7 +638,8 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 	Payload.Submitter = SubmitterState;
 	Payload.SubmittedAnswer = NormalizedAnswer;
 
-	const bool bMatchesAnswer = NormalizedAnswer.Equals(*CorrectAnswer, ESearchCase::IgnoreCase);
+	const bool bMatchesAnswer = NormalizedAnswer.Equals(
+		AssignedKeyword->Keyword, ESearchCase::IgnoreCase);
 	if (!bMatchesAnswer)
 	{
 		SIState->Multicast_BroadcastAnswerResult(Payload);
@@ -581,6 +652,7 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 		return;
 	}
 
+	const bool bIsFirstCorrect = CorrectPlayersThisTurn.IsEmpty();
 	const int32 ScoreIndex = FMath::Min(
 		CorrectPlayersThisTurn.Num(), CorrectAnswerScores.Num() - 1);
 	const int32 ScoreToEarn = CorrectAnswerScores.IsValidIndex(ScoreIndex)
@@ -588,6 +660,16 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 		: 0;
 	SubmitterState->AddScore(ScoreToEarn);
 	CorrectPlayersThisTurn.Add(Submitter);
+
+	if (ASIPlayerState* CreatorState = WorkspaceOwner->GetPlayerState<ASIPlayerState>())
+	{
+		const int32 CreatorScore = GetCreatorScoreForCorrectAnswer(
+			AssignedKeyword->Level, bIsFirstCorrect);
+		if (CreatorScore > 0)
+		{
+			CreatorState->AddScore(CreatorScore);
+		}
+	}
 
 	// Do not include the correct answer in data multicast to every client.
 	Payload.SubmittedAnswer = TEXT("");

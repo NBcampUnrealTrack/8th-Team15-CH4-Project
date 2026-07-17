@@ -15,6 +15,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "DataAsset/SIColorPalette.h"
+#include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameState/SIGameState.h"
 #include "Input/SIIPlayerCharacternputConfig.h"
@@ -87,6 +88,7 @@ ASICharacter::ASICharacter()
 	PreviewDistanceStep = 100.0f;
 	EditTraceDistance = 3000.0f;
 	MaxEditDistance = 3000.0f;
+	MaxPlacedShapeCount = 25;
 	PreviewRotation = FRotator::ZeroRotator;
 	PreviewScale = FVector::OneVector;
 	bIsEditingExistingShape = false;
@@ -1280,10 +1282,30 @@ void ASICharacter::ClearServerShapeEditState()
 	ServerEditingOriginalColorIndex = 0;
 }
 
+bool ASICharacter::CanSpawnPlacedShapeOnServer() const
+{
+	const UWorld* World = GetWorld();
+	if (!HasAuthority() || !World || MaxPlacedShapeCount < 1)
+	{
+		return false;
+	}
+
+	int32 PlacedShapeCount = 0;
+	for (TActorIterator<APlacedShapeActor> It(World); It; ++It)
+	{
+		if (IsValid(*It) && It->GetOwner() == this && ++PlacedShapeCount >= MaxPlacedShapeCount)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool ASICharacter::SpawnPlacedShapeOnServer(
 	const FName ShapeId, const FTransform& SpawnTransform, const uint8 ColorIndex)
 {
-	if (!HasAuthority() || !ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
+	if (!CanSpawnPlacedShapeOnServer() || !ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
 	{
 		return false;
 	}
@@ -1318,8 +1340,19 @@ bool ASICharacter::SpawnPlacedShapeOnServer(
 
 	APlacedShapeActor* PlacedShape = World->SpawnActor<APlacedShapeActor>(
 		PlacedShapeActorClass, SpawnTransform, SpawnParameters);
-	return PlacedShape && PlacedShape->SetPlacedShape(
-		ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor);
+	if (!PlacedShape)
+	{
+		return false;
+	}
+
+	if (!PlacedShape->SetPlacedShape(
+		ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor))
+	{
+		PlacedShape->Destroy();
+		return false;
+	}
+
+	return true;
 }
 
 void ASICharacter::RestoreActiveShapeEditForPhaseChange()
@@ -1350,47 +1383,10 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 		return;
 	}
 
-	if (!ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
+	if (SpawnPlacedShapeOnServer(ShapeId, SpawnTransform, ColorIndex)
+		&& bHasServerActiveShapeEdit)
 	{
-		return;
-	}
-
-	const FShapeDefinitionRow* ShapeDefinition = ShapeDefinitionTable->FindRow<FShapeDefinitionRow>(ShapeId, TEXT("Server_RequestSpawnShape"));
-	if (!ShapeDefinition || !ShapeDefinition->Mesh)
-	{
-		return;
-	}
-
-	if (!ColorPalette)
-	{
-		ColorPalette = USIColorPalette::LoadDefaultPalette();
-	}
-
-	FLinearColor ValidatedColor;
-	if (!ColorPalette || !ColorPalette->TryGetColor(ColorIndex, ValidatedColor))
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.Owner = this;
-	SpawnParameters.Instigator = this;
-
-	APlacedShapeActor* PlacedShape = World->SpawnActor<APlacedShapeActor>(PlacedShapeActorClass, SpawnTransform, SpawnParameters);
-	if (PlacedShape)
-	{
-		// 서버가 검증한 팔레트 색상만 실제 배치 도형에 저장한다.
-		if (PlacedShape->SetPlacedShape(ShapeDefinitionTable, ShapeId, SpawnTransform.GetScale3D(), ColorIndex, ValidatedColor)
-			&& bHasServerActiveShapeEdit)
-		{
-			ClearServerShapeEditState();
-		}
+		ClearServerShapeEditState();
 	}
 }
 

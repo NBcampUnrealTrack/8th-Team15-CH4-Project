@@ -154,6 +154,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
 	TSubclassOf<APlacedShapeActor> PlacedShapeActorClass;
 
+	// 캐릭터 한 명이 빌드 페이즈에 설치할 수 있는 최대 도형 수
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement|Limits", meta = (ClampMin = "1", UIMin = "1"))
+	int32 MaxPlacedShapeCount;
+
 	UPROPERTY()
 	TObjectPtr<APlacedShapeActor> HoveredShape;
 
@@ -227,6 +231,7 @@ private:
 	bool IsSelectionCameraLocked() const;
 	bool IsShapeEditingAllowed() const;
 	bool IsServerInBuildPhase() const;
+	bool CanSpawnPlacedShapeOnServer() const;
 	bool SpawnPlacedShapeOnServer(FName ShapeId, const FTransform& SpawnTransform, uint8 ColorIndex);
 	void ClearServerShapeEditState();
 

@@ -8,6 +8,18 @@
 class UDataTable;
 class AActor;
 
+USTRUCT()
+struct FSIAssignedKeyword
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString Keyword;
+
+	UPROPERTY()
+	int32 Level = 0;
+};
+
 /**
  * 모든 플레이어가 동시에 제작한 뒤 각 작업공간을 순회하며 정답을 맞히는 게임 모드입니다.
  */
@@ -46,6 +58,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Score")
 	TArray<int32> CorrectAnswerScores = { 2, 1 };
 
+	// The creator earns the configured level score for the first correct answer.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Score")
+	TMap<int32, int32> CreatorFirstCorrectScoresByLevel;
+
+	// From the second correct answer onward, the creator earns this score regardless of level.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Score", meta = (ClampMin = "0"))
+	int32 CreatorAdditionalCorrectScore = 1;
+
 	// MainLevel 중앙 빈 공간에 배치할 기준 액터의 Actor Tag입니다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Guess Spawn")
 	FName GuessViewingAreaTag = TEXT("GuessViewingArea");
@@ -82,7 +102,7 @@ private:
 
 	// 두 컨테이너는 GameMode에만 있으므로 정답 원본은 서버에만 존재합니다.
 	UPROPERTY()
-	TMap<APlayerController*, FString> PlayerAssignedWords;
+	TMap<APlayerController*, FSIAssignedKeyword> PlayerAssignedWords;
 
 	UPROPERTY()
 	TSet<APlayerController*> CorrectPlayersThisTurn;
@@ -97,6 +117,7 @@ private:
 	int32 CurrentWorkspaceIndex = -1;
 	
 	void ApplyHostMatchSettings();
+	int32 GetCreatorScoreForCorrectAnswer(int32 KeywordLevel, bool bIsFirstCorrect) const;
 
 	bool AssignWordsToPlayers();
 	void TryStartPendingMatch();
