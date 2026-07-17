@@ -7,6 +7,7 @@
 #include "SIDrawingToolWidget.generated.h"
 
 class UButton;
+class UTextBlock;
 class USIColorPalette;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSIOnColorSelected, int32, ColorIndex, FLinearColor, Color);
@@ -22,6 +23,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Palette")
 	void SelectPaletteColor(int32 ColorIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void SetPlacementCount(int32 RemainingCount, int32 MaxCount);
+
 	// 색상 버튼이 선택한 팔레트 인덱스와 실제 색상을 게임플레이 코드로 전달한다.
 	UPROPERTY(BlueprintAssignable, Category = "Palette")
 	FSIOnColorSelected OnColorSelected;
@@ -34,6 +38,9 @@ protected:
 	TObjectPtr<USIColorPalette> ColorPalette;
 
 private:
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_RemainingShapes;
+
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Button_Color1;
 

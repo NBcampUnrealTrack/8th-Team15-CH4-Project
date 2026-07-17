@@ -24,6 +24,7 @@
 #include "Object/PlacementPreviewActor.h"
 #include "Object/ShapeDefinitionRow.h"
 #include "PlayerController/SIPlayerController.h"
+#include "Net/UnrealNetwork.h"
 #include "UI/SIDrawingToolWidget.h"
 #include "UI/SIUserWidget.h"
 #include "Component/SIUIManagerComponent.h"
@@ -211,6 +212,8 @@ void ASICharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 void ASICharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME_CONDITION(ASICharacter, PlacedShapeCount, COND_OwnerOnly);
 }
 
 void ASICharacter::UpdateMeshVisibility()
@@ -1282,7 +1285,39 @@ void ASICharacter::ClearServerShapeEditState()
 	ServerEditingOriginalColorIndex = 0;
 }
 
-bool ASICharacter::CanSpawnPlacedShapeOnServer() const
+int32 ASICharacter::GetRemainingPlacedShapeCount() const
+{
+	return FMath::Clamp(MaxPlacedShapeCount - PlacedShapeCount, 0, MaxPlacedShapeCount);
+}
+
+void ASICharacter::SetPlacedShapeCount(const int32 NewCount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	PlacedShapeCount = FMath::Clamp(NewCount, 0, MaxPlacedShapeCount);
+	OnRep_PlacedShapeCount();
+}
+
+void ASICharacter::OnRep_PlacedShapeCount()
+{
+	UpdatePlacementCountUI();
+	UpdateShapePanelAvailability();
+}
+
+void ASICharacter::UpdatePlacementCountUI()
+{
+	const ASIPlayerController* PlayerController = Cast<ASIPlayerController>(GetController());
+	if (PlayerController && PlayerController->DrawingToolWidget)
+	{
+		PlayerController->DrawingToolWidget->SetPlacementCount(
+			GetRemainingPlacedShapeCount(), MaxPlacedShapeCount);
+	}
+}
+
+bool ASICharacter::CanSpawnPlacedShapeOnServer(const bool bReplacingExistingShape) const
 {
 	const UWorld* World = GetWorld();
 	if (!HasAuthority() || !World || MaxPlacedShapeCount < 1)
@@ -1290,10 +1325,20 @@ bool ASICharacter::CanSpawnPlacedShapeOnServer() const
 		return false;
 	}
 
-	int32 PlacedShapeCount = 0;
+	if (bReplacingExistingShape)
+	{
+		return true;
+	}
+
+	if (PlacedShapeCount >= MaxPlacedShapeCount)
+	{
+		return false;
+	}
+
+	int32 ExistingShapeCount = 0;
 	for (TActorIterator<APlacedShapeActor> It(World); It; ++It)
 	{
-		if (IsValid(*It) && It->GetOwner() == this && ++PlacedShapeCount >= MaxPlacedShapeCount)
+		if (IsValid(*It) && It->GetOwner() == this && ++ExistingShapeCount >= MaxPlacedShapeCount)
 		{
 			return false;
 		}
@@ -1303,9 +1348,11 @@ bool ASICharacter::CanSpawnPlacedShapeOnServer() const
 }
 
 bool ASICharacter::SpawnPlacedShapeOnServer(
-	const FName ShapeId, const FTransform& SpawnTransform, const uint8 ColorIndex)
+	const FName ShapeId, const FTransform& SpawnTransform, const uint8 ColorIndex,
+	const bool bReplacingExistingShape)
 {
-	if (!CanSpawnPlacedShapeOnServer() || !ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
+	if (!CanSpawnPlacedShapeOnServer(bReplacingExistingShape)
+		|| !ShapeDefinitionTable || ShapeId.IsNone() || !PlacedShapeActorClass)
 	{
 		return false;
 	}
@@ -1352,6 +1399,11 @@ bool ASICharacter::SpawnPlacedShapeOnServer(
 		return false;
 	}
 
+	if (!bReplacingExistingShape)
+	{
+		SetPlacedShapeCount(PlacedShapeCount + 1);
+	}
+
 	return true;
 }
 
@@ -1365,7 +1417,8 @@ void ASICharacter::RestoreActiveShapeEditForPhaseChange()
 	if (SpawnPlacedShapeOnServer(
 		ServerEditingOriginalShapeId,
 		ServerEditingOriginalTransform,
-		ServerEditingOriginalColorIndex))
+		ServerEditingOriginalColorIndex,
+		true))
 	{
 		ClearServerShapeEditState();
 	}
@@ -1383,8 +1436,9 @@ void ASICharacter::Server_RequestSpawnShape_Implementation(FName ShapeId, FTrans
 		return;
 	}
 
-	if (SpawnPlacedShapeOnServer(ShapeId, SpawnTransform, ColorIndex)
-		&& bHasServerActiveShapeEdit)
+	const bool bReplacingExistingShape = bHasServerActiveShapeEdit;
+	if (SpawnPlacedShapeOnServer(ShapeId, SpawnTransform, ColorIndex, bReplacingExistingShape)
+		&& bReplacingExistingShape)
 	{
 		ClearServerShapeEditState();
 	}
@@ -1463,6 +1517,7 @@ void ASICharacter::Server_RequestDeleteEditedShape_Implementation()
 	}
 
 	// 선택 시작 시 원본 액터는 이미 제거됐으므로 서버 편집 상태를 비우면 삭제가 확정된다.
+	SetPlacedShapeCount(PlacedShapeCount - 1);
 	ClearServerShapeEditState();
 }
 

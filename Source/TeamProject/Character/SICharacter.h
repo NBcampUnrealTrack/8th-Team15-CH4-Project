@@ -205,6 +205,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Placement|Color")
 	void SetSelectedPaletteColor(int32 ColorIndex, FLinearColor Color);
 
+	UFUNCTION(BlueprintPure, Category = "Placement|Limits")
+	int32 GetPlacedShapeCount() const { return PlacedShapeCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Placement|Limits")
+	int32 GetMaxPlacedShapeCount() const { return MaxPlacedShapeCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Placement|Limits")
+	int32 GetRemainingPlacedShapeCount() const;
+
 	void HandleShapeEditingPhaseChanged(ESIGamePhase NewPhase);
 	void RestoreActiveShapeEditForPhaseChange();
 	
@@ -231,9 +240,17 @@ private:
 	bool IsSelectionCameraLocked() const;
 	bool IsShapeEditingAllowed() const;
 	bool IsServerInBuildPhase() const;
-	bool CanSpawnPlacedShapeOnServer() const;
-	bool SpawnPlacedShapeOnServer(FName ShapeId, const FTransform& SpawnTransform, uint8 ColorIndex);
+	bool CanSpawnPlacedShapeOnServer(bool bReplacingExistingShape) const;
+	bool SpawnPlacedShapeOnServer(FName ShapeId, const FTransform& SpawnTransform, uint8 ColorIndex, bool bReplacingExistingShape);
+	void SetPlacedShapeCount(int32 NewCount);
+	void UpdatePlacementCountUI();
 	void ClearServerShapeEditState();
+
+	UPROPERTY(ReplicatedUsing = OnRep_PlacedShapeCount, VisibleInstanceOnly, BlueprintReadOnly, Category = "Placement|Limits", meta = (AllowPrivateAccess = "true"))
+	int32 PlacedShapeCount = 0;
+
+	UFUNCTION()
+	void OnRep_PlacedShapeCount();
 
 	// 서버가 보관하는 재배치 원본 정보다.
 	bool bHasServerActiveShapeEdit = false;

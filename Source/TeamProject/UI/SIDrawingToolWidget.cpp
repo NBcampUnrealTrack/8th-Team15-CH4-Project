@@ -4,6 +4,8 @@
 #include "UI/SIDrawingToolWidget.h"
 
 #include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "Character/SICharacter.h"
 #include "DataAsset/SIColorPalette.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -39,6 +41,32 @@ void USIDrawingToolWidget::NativeConstruct()
 	if (Button_Color8) Button_Color8->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor8Clicked);
 	if (Button_Color9) Button_Color9->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor9Clicked);
 	if (Button_Color10) Button_Color10->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleColor10Clicked);
+
+	if (const ASICharacter* Character = Cast<ASICharacter>(GetOwningPlayerPawn()))
+	{
+		SetPlacementCount(
+			Character->GetRemainingPlacedShapeCount(),
+			Character->GetMaxPlacedShapeCount());
+	}
+}
+
+void USIDrawingToolWidget::SetPlacementCount(const int32 RemainingCount, const int32 MaxCount)
+{
+	if (!Text_RemainingShapes)
+	{
+		return;
+	}
+
+	const int32 SafeMaxCount = FMath::Max(MaxCount, 0);
+	const int32 SafeRemainingCount = FMath::Clamp(RemainingCount, 0, SafeMaxCount);
+	Text_RemainingShapes->SetText(FText::Format(
+		NSLOCTEXT("DrawingTool", "RemainingShapes", "남은 도형: {0} / {1}"),
+		SafeRemainingCount,
+		SafeMaxCount));
+	Text_RemainingShapes->SetColorAndOpacity(
+		SafeRemainingCount > 0
+			? FSlateColor(FLinearColor::White)
+			: FSlateColor(FLinearColor(1.0f, 0.2f, 0.2f)));
 }
 
 void USIDrawingToolWidget::NativeDestruct()
