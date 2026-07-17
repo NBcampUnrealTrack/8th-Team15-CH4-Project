@@ -5,7 +5,6 @@
 
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystemUtils.h"
-#include "Kismet/GameplayStatics.h"
 #include "Online/OnlineSessionNames.h"
 
 // 커스텀 세션 데이터 키 — 오타 방지를 위해 상수로 한 곳에
@@ -330,20 +329,20 @@ void USISessionSubsystem::LeaveSession()
 {
 	if (!EnsureSessionInterface())
 	{
-		OnDestroySessionCompleteEvent.Broadcast(false);
+		OnSessionLeftEvent.Broadcast(ESISessionLeaveReason::UserRequested);
 		return;
 	}
 
-	// 세션이 없는데 눌렀으면 그냥 "나간 것"으로 처리 (방어)
 	if (!SessionInterface->GetNamedSession(NAME_GameSession))
 	{
 		PrintNS(TEXT("LeaveSession: no session to leave"));
-		OnDestroySessionCompleteEvent.Broadcast(true);
+		OnSessionLeftEvent.Broadcast(ESISessionLeaveReason::UserRequested);   // 정리할 게 없어도 "나갔다"는 사실은 방송
 		return;
 	}
 
-	bReturnToMainMenuOnDestroy = true;
-	DestroySession();   // 기존 Destroy 경로 재사용 — 완료는 OnDestroySessionComplete로
+	bLeaveInProgress = true;
+	PendingLeaveReason = ESISessionLeaveReason::UserRequested;
+	DestroySession();
 }
 
 void USISessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
@@ -360,11 +359,11 @@ void USISessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasS
 		CreateSessionInternal();
 	}
 	
-	// LeaveSession 경로였다면 메인메뉴로 복귀
-	if (bReturnToMainMenuOnDestroy)
+	// "나가는 중"이었다면 의미적 이벤트로 완료 통지 — 후속 흐름은 구독자의 몫
+	if (bLeaveInProgress)
 	{
-		bReturnToMainMenuOnDestroy = false;
-		UGameplayStatics::OpenLevel(GetWorld(), FName("MainMenu"));   // listen 옵션 없음 — 혼자 노는 맵
+		bLeaveInProgress = false;
+		OnSessionLeftEvent.Broadcast(PendingLeaveReason);
 	}
 }
 
@@ -376,19 +375,20 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 	const FString& ErrorString)
 {
 	PrintNS(FString::Printf(TEXT("Network Failure: %s"), *ErrorString), FColor::Red);
+	
+	OnNetworkFailureEvent.Broadcast(false); 
 
 	// 실패한 접속이 남긴 로컬 세션 정리 → 재시도 가능 상태 복구
 	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
 	{
-		bReturnToMainMenuOnDestroy = true;    // ★ 정리 후 메인메뉴 복귀 예약
-		DestroySession();
+		bLeaveInProgress = true;
+        PendingLeaveReason = ESISessionLeaveReason::ConnectionLost;
+        DestroySession();
 	}
 	else
 	{
-		UGameplayStatics::OpenLevel(GetWorld(), FName("MainMenu"));   // 정리할 세션이 없으면 즉시 복귀
+		OnSessionLeftEvent.Broadcast(ESISessionLeaveReason::ConnectionLost);
 	}
-
-	OnNetworkFailureEvent.Broadcast(false); 
 }
 
 #pragma endregion

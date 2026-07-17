@@ -63,11 +63,20 @@ struct FSISessionInfo
 	int32 SearchResultIndex = INDEX_NONE;
 };
 
+/** 방을 떠나게 된 이유 — UI가 안내 문구를 구분하는 데 사용 */
+UENUM(BlueprintType)
+enum class ESISessionLeaveReason : uint8
+{
+	UserRequested   UMETA(DisplayName = "유저가 나가기 선택"),
+	ConnectionLost  UMETA(DisplayName = "연결 끊김/호스트 이탈")
+};
+
 /** ── UI(BP)로 결과를 방송하는 번역 계층 ── */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnCreateSessionComplete, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnDestroySessionComplete, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSIOnFindSessionsComplete, const TArray<FSISessionInfo>&, Sessions, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnJoinSessionComplete, bool, bWasSuccessful);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnSessionLeft, ESISessionLeaveReason, Reason);
 
 UCLASS()
 class TEAMPROJECT_API USISessionSubsystem : public UGameInstanceSubsystem
@@ -126,6 +135,11 @@ public:
 	/** 접속 실패/추방 통지 — UI가 "비밀번호가 틀렸습니다" 등을 띄우는 데 사용 */
 	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
 	FSIOnJoinSessionComplete OnNetworkFailureEvent;   // FString 파라미터 델리게이트를 따로 선언해도 좋음
+
+	/** "방에서 나오게 됐다"는 의미적 이벤트. 세션 정리가 끝난 뒤 방송된다.
+		구독자(레벨/UI)가 메인메뉴 복귀 등 후속 흐름을 결정한다. */
+	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
+	FSIOnSessionLeft OnSessionLeftEvent;
 	
 protected:
 	/** ── OSS 완료 콜백 (내부용) ── */
@@ -162,8 +176,9 @@ private:
 	/** Join 시에 입력된 Password 입력값 보관 */
 	FString PendingJoinPassword;
 
-	// Destroy 완료 후 복귀 예약 플래그
-	bool bReturnToMainMenuOnDestroy = false;   
+	/** bReturnToMainMenuOnDestroy 를 대체 — "나가는 중" 상태와 이유 */
+	bool bLeaveInProgress = false;
+	ESISessionLeaveReason PendingLeaveReason = ESISessionLeaveReason::UserRequested;
 	
 #pragma endregion
 };
