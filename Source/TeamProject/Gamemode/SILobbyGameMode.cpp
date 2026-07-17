@@ -80,7 +80,7 @@ void ASILobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 	if (ClientPassword != HostParams.Password)
 	{
 		// 채우는 순간 접속 거절
-		ErrorMessage = TEXT("Incorrect password");   
+		ErrorMessage = SISessionErrors::WrongPassword;   
 		
 		UE_LOG(LogTemp, Warning, TEXT("[Lobby] PreLogin rejected: wrong password from %s"), *Address);
 	}

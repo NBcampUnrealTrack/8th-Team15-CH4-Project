@@ -7,6 +7,11 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SISessionSubsystem.generated.h"
 
+namespace SISessionErrors
+{
+	static const FString WrongPassword = TEXT("Incorrect password");
+}
+
 /** 방 생성 시 UI에서 받아오는 설정 묶음 */
 USTRUCT(BlueprintType)
 struct FSICreateSessionParams
@@ -17,7 +22,7 @@ struct FSICreateSessionParams
 	FString RoomTitle = TEXT("New Room");
 
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
-	int32 MaxPlayers = 5;
+	int32 MaxPlayers = 8;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
 	bool bIsPrivate = false;
@@ -71,12 +76,22 @@ enum class ESISessionLeaveReason : uint8
 	ConnectionLost  UMETA(DisplayName = "연결 끊김/호스트 이탈")
 };
 
+/** 접속/연결 실패의 의미 분류 — UI가 안내 문구를 결정하는 기준 */
+UENUM(BlueprintType)
+enum class ESIConnectionFailureType : uint8
+{
+	WrongPassword    UMETA(DisplayName = "비밀번호 불일치"),
+	ConnectionLost   UMETA(DisplayName = "연결 끊김 (호스트 이탈 등)"),
+	Unknown          UMETA(DisplayName = "기타 오류")
+};
+
 /** ── UI(BP)로 결과를 방송하는 번역 계층 ── */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnCreateSessionComplete, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnDestroySessionComplete, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSIOnFindSessionsComplete, const TArray<FSISessionInfo>&, Sessions, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnJoinSessionComplete, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSIOnSessionLeft, ESISessionLeaveReason, Reason);
+
 
 UCLASS()
 class TEAMPROJECT_API USISessionSubsystem : public UGameInstanceSubsystem
@@ -118,6 +133,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SI|Session")
 	const FSICreateSessionParams& GetHostSessionParams() const { return PendingParams; }
 
+	/** 마지막 연결 실패 정보를 꺼내간다 (1회성 — 읽으면 비워짐).
+		실패가 없었으면 false 반환. MainMenu가 도착 직후 호출해 안내 팝업에 사용 */
+	UFUNCTION(BlueprintCallable, Category = "SI|Session")
+	bool ConsumeLastFailure(ESIConnectionFailureType& OutType, FString& OutRawMessage);
 	
 	/** ── UI가 구독하는 방송 채널 ── */
 	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
@@ -131,10 +150,6 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
 	FSIOnJoinSessionComplete OnJoinSessionCompleteEvent;
-
-	/** 접속 실패/추방 통지 — UI가 "비밀번호가 틀렸습니다" 등을 띄우는 데 사용 */
-	UPROPERTY(BlueprintAssignable, Category = "SI|Session")
-	FSIOnJoinSessionComplete OnNetworkFailureEvent;   // FString 파라미터 델리게이트를 따로 선언해도 좋음
 
 	/** "방에서 나오게 됐다"는 의미적 이벤트. 세션 정리가 끝난 뒤 방송된다.
 		구독자(레벨/UI)가 메인메뉴 복귀 등 후속 흐름을 결정한다. */
@@ -179,6 +194,10 @@ private:
 	/** bReturnToMainMenuOnDestroy 를 대체 — "나가는 중" 상태와 이유 */
 	bool bLeaveInProgress = false;
 	ESISessionLeaveReason PendingLeaveReason = ESISessionLeaveReason::UserRequested;
+	
+	bool bHasPendingFailure = false;
+	ESIConnectionFailureType LastFailureType = ESIConnectionFailureType::Unknown;
+	FString LastFailureRawMessage;
 	
 #pragma endregion
 };

@@ -375,20 +375,45 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 	const FString& ErrorString)
 {
 	PrintNS(FString::Printf(TEXT("Network Failure: %s"), *ErrorString), FColor::Red);
-	
-	OnNetworkFailureEvent.Broadcast(false); 
 
-	// 실패한 접속이 남긴 로컬 세션 정리 → 재시도 가능 상태 복구
+	// 1) 실패를 의미 단위로 분류
+	ESIConnectionFailureType Classified = ESIConnectionFailureType::Unknown;
+	if (FailureType == ENetworkFailure::PendingConnectionFailure
+		&& ErrorString.Contains(SISessionErrors::WrongPassword))   // 상수 안 쓰면 TEXT("Incorrect password")
+	{
+		Classified = ESIConnectionFailureType::WrongPassword;
+	}
+	else if (FailureType == ENetworkFailure::ConnectionLost
+		  || FailureType == ENetworkFailure::ConnectionTimeout)
+	{
+		Classified = ESIConnectionFailureType::ConnectionLost;
+	}
+
+	// 2) 우편함에 보관 (후속 실패가 덮어써도 무해)
+	LastFailureType = Classified;
+	LastFailureRawMessage = ErrorString;
+	bHasPendingFailure = true;
+
+	// 3) 세션 정리 + 나감 통지 예약 — 세션이 "있을 때만"
+	//    세션이 없다 = 이미 첫 실패가 정리/통지를 끝냈다는 뜻이므로, 후속 실패는 기록만 하고 조용히 무시
 	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
 	{
 		bLeaveInProgress = true;
-        PendingLeaveReason = ESISessionLeaveReason::ConnectionLost;
-        DestroySession();
+		PendingLeaveReason = ESISessionLeaveReason::ConnectionLost;
+		DestroySession();
 	}
-	else
+}
+
+bool USISessionSubsystem::ConsumeLastFailure(ESIConnectionFailureType& OutType, FString& OutRawMessage)
+{
+	if (!bHasPendingFailure)
 	{
-		OnSessionLeftEvent.Broadcast(ESISessionLeaveReason::ConnectionLost);
+		return false;
 	}
+	OutType = LastFailureType;
+	OutRawMessage = LastFailureRawMessage;
+	bHasPendingFailure = false;   // 1회성 — 다음 메인메뉴 진입 때 옛 실패가 또 뜨지 않게
+	return true;
 }
 
 #pragma endregion
