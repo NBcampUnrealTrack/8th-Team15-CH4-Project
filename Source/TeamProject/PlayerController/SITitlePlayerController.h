@@ -65,7 +65,7 @@ private:
 	void HandleQuit();
 	
 	UFUNCTION()
-	void OnCreateRoomClicked();
+	void OnCreateRoomClicked(const FSIRoomSettings& Settings);
 	
 #pragma endregion
 

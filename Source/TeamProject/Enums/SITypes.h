@@ -57,3 +57,37 @@ struct TEAMPROJECT_API FChatMessagePayload
 	UPROPERTY(BlueprintReadOnly, Category = "Chat")
 	FString Message;
 };
+
+USTRUCT(BlueprintType)
+struct TEAMPROJECT_API FChatLogEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FString SenderName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FString Message;
+};
+
+USTRUCT(BlueprintType)
+struct TEAMPROJECT_API FSIRoomSettings
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
+	FString RoomName;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
+	FString RoomPassword;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
+	bool bIsPrivate = false;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
+	int32 BuildTimeLimit = 120;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
+	int32 GuessTimeLimit = 30;
+	
+};

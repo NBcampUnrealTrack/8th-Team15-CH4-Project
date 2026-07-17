@@ -92,6 +92,9 @@ private:
 
 	void ShowResult(bool bCorrect);
 	void HideResult();
+
+	void AddChatLineToScrollBox(const FString& SenderName, const FString& Message);
+	void RestoreChatHistory();
 	
 	UFUNCTION()
 	void HandlePhaseChanged(ESIGamePhase NewPhase);

@@ -90,9 +90,9 @@ void ASITitlePlayerController::HandleQuit()
 	UIManagerComponent->OpenWidget(EUIType::Exit);
 }
 
-void ASITitlePlayerController::OnCreateRoomClicked()
+void ASITitlePlayerController::OnCreateRoomClicked(const FSIRoomSettings& Settings)
 {
-	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
+	Cast<USIGameInstance>(GetGameInstance())->CreateRoom(Settings);
 	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));
 }
 #pragma region Sound

@@ -146,9 +146,6 @@ private:
 	UPROPERTY()
 	TObjectPtr<USILobbySettingWidget> LobbySettingWidget;
 
-	UFUNCTION()
-	void StartRoomCreation();
-
 	void OpenLobbySettingWidget();
 
 	void CloseLobbySettingWidget();

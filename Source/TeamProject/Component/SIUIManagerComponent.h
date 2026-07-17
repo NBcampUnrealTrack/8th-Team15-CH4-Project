@@ -31,7 +31,7 @@ public:
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUIConfirmed, EUIType, type);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCreateRoomRequested);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCreateRoomRequested, const FSIRoomSettings&, payload);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TEAMPROJECT_API USIUIManagerComponent : public UActorComponent

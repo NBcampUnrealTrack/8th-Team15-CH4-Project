@@ -17,7 +17,7 @@ void USIRoomListWidget::NativeConstruct()
 
 	if (Button_Join)
 	{
-		Button_Join->OnClicked.AddDynamic(this, &USIRoomListWidget::HandleCreateClicked);
+		Button_Join->OnClicked.AddDynamic(this, &USIRoomListWidget::HandleJoinClicked);
 	}
 }
 
@@ -26,7 +26,7 @@ void USIRoomListWidget::HandleBackClicked()
 	HandleCancelled();
 }
 
-void USIRoomListWidget::HandleCreateClicked()
+void USIRoomListWidget::HandleJoinClicked()
 {
 	//테스트 코드입니다. Null SubSystem 도입시 삭제 바랍니다
 	if (UWorld* World = GetWorld())

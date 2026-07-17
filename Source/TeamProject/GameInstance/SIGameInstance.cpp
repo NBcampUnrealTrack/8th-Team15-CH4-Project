@@ -5,8 +5,12 @@
 
 #include "Kismet/GameplayStatics.h"
 
-void USIGameInstance::CreateRoom()
+void USIGameInstance::CreateRoom(const FSIRoomSettings& NewRoomSettings)
 {
+	ClearChatHistory();
+	
+	RoomSettings = NewRoomSettings;
+	
 	UGameplayStatics::OpenLevel(
 		this,
 		FName("/Game/Shape_It/Level/Test_Lobby"),
@@ -17,6 +21,10 @@ void USIGameInstance::CreateRoom()
 
 void USIGameInstance::JoinRoom(const FString& Address)
 {
+	ClearChatHistory();
+	
+	RoomSettings = FSIRoomSettings();
+	
 	UGameplayStatics::OpenLevel(this, FName(*Address), false);
 }
 
@@ -35,4 +43,21 @@ void USIGameInstance::ConsumePendingMatch()
 {
 	bPendingMatchStart = false;
 	ExpectedPlayerCount = 0;
+}
+
+void USIGameInstance::AddChatLog(const FString& SenderName, const FString& Message)
+{
+	FChatLogEntry& Entry = ChatHistory.AddDefaulted_GetRef();
+	Entry.SenderName = SenderName;
+	Entry.Message = Message;
+
+	if (ChatHistory.Num() > MaxChatHistoryCount)
+	{
+		ChatHistory.RemoveAt(0, ChatHistory.Num() - MaxChatHistoryCount);
+	}
+}
+
+void USIGameInstance::ClearChatHistory()
+{
+	ChatHistory.Reset();
 }

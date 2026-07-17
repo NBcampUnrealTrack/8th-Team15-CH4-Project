@@ -5,6 +5,7 @@
 
 #include "Components/CheckBox.h"
 #include "Components/Button.h"
+#include "Components/EditableText.h"
 
 void USICreateRoomWidget::NativeConstruct()
 {
@@ -29,6 +30,30 @@ void USICreateRoomWidget::NativeConstruct()
 	{
 		Button_Create->OnClicked.AddDynamic(this, &USICreateRoomWidget::HandleCreateClicked);
 	}
+}
+
+FSIRoomSettings USICreateRoomWidget::GetRoomSettings() const
+{
+	FSIRoomSettings Settings;
+
+	int32 BuildTime = FCString::Atoi(*EditableText_BuildTimeLimit->GetText().ToString());
+	int32 GuessTime = FCString::Atoi(*EditableText_GuessTimeLimit->GetText().ToString());
+
+	Settings.RoomName = EditableText_RoomName->GetText().ToString();
+	Settings.RoomPassword = EditableText_RoomPassword->GetText().ToString();
+	Settings.bIsPrivate = bIsPrivate;
+	
+	if (BuildTime > 0)
+	{
+		Settings.BuildTimeLimit = BuildTime;
+	}
+	
+	if (GuessTime > 0)
+	{
+		Settings.GuessTimeLimit = GuessTime;
+	}
+	
+	return Settings;
 }
 
 void USICreateRoomWidget::HandleBackClicked()

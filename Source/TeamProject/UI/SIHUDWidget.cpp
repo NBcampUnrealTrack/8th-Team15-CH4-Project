@@ -2,6 +2,7 @@
 
 #include "UI/SIHUDWidget.h"
 #include "PlayerController/SIPlayerController.h"
+#include "GameInstance/SIGameInstance.h"
 #include "GameState/SIGameState.h"
 #include "PlayerState/SIPlayerState.h"
 #include "UI/SIChatLineWidget.h"
@@ -37,6 +38,8 @@ void USIHUDWidget::NativeConstruct()
 	{
 		EditableText_AnswerInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
 	}
+
+	RestoreChatHistory();
 
 	// GameState/PlayerState 의존 배선은 준비될 때까지 재시도
 	BindGameData();
@@ -205,20 +208,49 @@ void USIHUDWidget::FocusChatInput()
 	}
 }
 
-void USIHUDWidget::HandleChatMessage(const FChatMessagePayload& Payload)
+void USIHUDWidget::AddChatLineToScrollBox(const FString& SenderName, const FString& Message)
 {
 	if (!IsValid(ScrollBox_ChatLog) || !ChatLineWidgetClass)
 	{
 		return;
 	}
-	
-	FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
-    
+
 	USIChatLineWidget* Line = CreateWidget<USIChatLineWidget>(this, ChatLineWidgetClass);
-	Line->SetMessage(SenderName, Payload.Message);
-    
+	if (!IsValid(Line))
+	{
+		return;
+	}
+
+	Line->SetMessage(SenderName, Message);
+
 	ScrollBox_ChatLog->AddChild(Line);
 	ScrollBox_ChatLog->ScrollToEnd();
+}
+
+void USIHUDWidget::RestoreChatHistory()
+{
+	USIGameInstance* GI = GetGameInstance<USIGameInstance>();
+	if (!IsValid(GI))
+	{
+		return;
+	}
+
+	for (const FChatLogEntry& Entry : GI->GetChatHistory())
+	{
+		AddChatLineToScrollBox(Entry.SenderName, Entry.Message);
+	}
+}
+
+void USIHUDWidget::HandleChatMessage(const FChatMessagePayload& Payload)
+{
+	const FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
+
+	if (USIGameInstance* GI = GetGameInstance<USIGameInstance>())
+	{
+		GI->AddChatLog(SenderName, Payload.Message);
+	}
+
+	AddChatLineToScrollBox(SenderName, Payload.Message);
 }
 
 void USIHUDWidget::HandleAnswerResult(const FAnswerResultPayload& Payload)

@@ -2,8 +2,9 @@
 
 
 #include "Component/SIUIManagerComponent.h"
-
 #include "UI/SIUserWidget.h"
+#include "UI/SICreateRoomWidget.h"
+
 #include "GameFramework/PlayerController.h"
 
 USIUIManagerComponent::USIUIManagerComponent()
@@ -115,6 +116,21 @@ void USIUIManagerComponent::OnWidgetCancelled()
 
 void USIUIManagerComponent::HandleCreateRoomRequested()
 {
-	OnCreateRoomRequested.Broadcast();
+	FUIStackEntry* Entry = WidgetStack.FindByPredicate(
+	[](const FUIStackEntry& StackEntry)
+	{
+		return StackEntry.UIType == EUIType::CreateRoom;
+	});
+	
+	if (Entry)
+	{
+		USICreateRoomWidget* CreateRoomWidget = Cast<USICreateRoomWidget>(Entry->Widget);
+		
+		if (!IsValid(CreateRoomWidget))
+		{
+			return;
+		}
+		OnCreateRoomRequested.Broadcast(CreateRoomWidget->GetRoomSettings());
+	}
 }
 

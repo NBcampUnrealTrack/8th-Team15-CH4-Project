@@ -425,10 +425,6 @@ void ASIPlayerController::TryCacheGameState()
 	HandlePhaseChanged(GS->CurrentGamePhase);
 }
 
-void ASIPlayerController::StartRoomCreation()
-{
-	Cast<USIGameInstance>(GetGameInstance())->CreateRoom();
-}
 
 void ASIPlayerController::OpenLobbySettingWidget()
 {

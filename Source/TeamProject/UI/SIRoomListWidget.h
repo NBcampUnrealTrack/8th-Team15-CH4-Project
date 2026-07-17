@@ -8,8 +8,6 @@
 
 class UButton;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOn);
-
 UCLASS()
 class TEAMPROJECT_API USIRoomListWidget : public USIUserWidget
 {
@@ -30,5 +28,5 @@ private:
 	void HandleBackClicked();
 
 	UFUNCTION()
-	void HandleCreateClicked();
+	void HandleJoinClicked();
 };
