@@ -90,7 +90,7 @@ void ASITitlePlayerController::HandleQuit()
 	UIManagerComponent->OpenWidget(EUIType::Exit);
 }
 
-void ASITitlePlayerController::OnCreateRoomClicked(const FSIRoomSettings& Settings)
+void ASITitlePlayerController::OnCreateRoomClicked(const FSICreateSessionParams& Settings)
 {
 	Cast<USIGameInstance>(GetGameInstance())->CreateRoom(Settings);
 	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));

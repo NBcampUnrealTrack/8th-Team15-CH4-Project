@@ -32,27 +32,34 @@ void USICreateRoomWidget::NativeConstruct()
 	}
 }
 
-FSIRoomSettings USICreateRoomWidget::GetRoomSettings() const
+FSICreateSessionParams USICreateRoomWidget::GetRoomSettings() const
 {
-	FSIRoomSettings Settings;
+	FSICreateSessionParams Settings;
 
-	int32 BuildTime = FCString::Atoi(*EditableText_BuildTimeLimit->GetText().ToString());
-	int32 GuessTime = FCString::Atoi(*EditableText_GuessTimeLimit->GetText().ToString());
+	const FString RoomTitle = EditableText_RoomName->GetText().ToString();
+	const int32 BuildTime = FCString::Atoi(*EditableText_BuildTimeLimit->GetText().ToString());
+	const int32 GuessTime = FCString::Atoi(*EditableText_GuessTimeLimit->GetText().ToString());
 
-	Settings.RoomName = EditableText_RoomName->GetText().ToString();
-	Settings.RoomPassword = EditableText_RoomPassword->GetText().ToString();
+	// 빈칸이면 대입하지 않아 구조체 기본값이 살아남는다.
+	// 시간은 0 이하가 "미지정" 센티널 — GameMode가 자기 기본값을 쓴다.
+	if (!RoomTitle.IsEmpty())
+	{
+		Settings.RoomTitle = RoomTitle;
+	}
+
+	Settings.Password = EditableText_RoomPassword->GetText().ToString();
 	Settings.bIsPrivate = bIsPrivate;
-	
+
 	if (BuildTime > 0)
 	{
-		Settings.BuildTimeLimit = BuildTime;
+		Settings.BuildTime = BuildTime;
 	}
-	
+
 	if (GuessTime > 0)
 	{
-		Settings.GuessTimeLimit = GuessTime;
+		Settings.GuessTime = GuessTime;
 	}
-	
+
 	return Settings;
 }
 

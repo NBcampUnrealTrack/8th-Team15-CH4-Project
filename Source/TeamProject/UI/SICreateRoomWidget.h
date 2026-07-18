@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UI/SIUserWidget.h"
-#include "Enums/SITypes.h"
+#include "GameInstance/SISessionSubsystem.h"
 #include "SICreateRoomWidget.generated.h"
 
 class UCheckBox;
@@ -47,7 +47,7 @@ private:
 	bool bIsPrivate = false;
 	
 public:
-	FSIRoomSettings GetRoomSettings() const;
+	FSICreateSessionParams GetRoomSettings() const;
 	
 private:
 	UFUNCTION()

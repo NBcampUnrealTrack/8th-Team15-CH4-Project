@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Components/AudioComponent.h"
+#include "GameInstance/SISessionSubsystem.h"
 #include "SITitlePlayerController.generated.h"
 
 class UInputAction;
@@ -65,7 +66,7 @@ private:
 	void HandleQuit();
 	
 	UFUNCTION()
-	void OnCreateRoomClicked(const FSIRoomSettings& Settings);
+	void OnCreateRoomClicked(const FSICreateSessionParams& Settings);
 	
 #pragma endregion
 

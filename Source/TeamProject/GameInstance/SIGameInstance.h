@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "Enums/SITypes.h"
+#include "GameInstance/SISessionSubsystem.h"
 #include "SIGameInstance.generated.h"
 
 /**
@@ -16,8 +17,9 @@ class TEAMPROJECT_API USIGameInstance : public UGameInstance
 	GENERATED_BODY()
 	
 public:
-	// 서버의 GameInstance에만 보관되며 플레이어가 방을 만들어 호스트가 되었을때 설정한 방설정을 적용하는데 사용합니다.
-	void CreateRoom(const FSIRoomSettings& NewRoomSettings);   // 지금은 내부에서 OpenLevel(...,"listen") 호출
+	// 세션 생성을 요청한다. 방 설정의 보관 주체는 USISessionSubsystem(GetHostSessionParams()로 조회).
+	// 세션이 실제로 만들어진 뒤에야 로비 맵을 listen으로 연다.
+	void CreateRoom(const FSICreateSessionParams& NewRoomSettings);
 	void JoinRoom(const FString& Address); // 지금은 내부에서 OpenLevel(Address) 호출
 
 	// 서버의 GameInstance에만 보관되며 레벨 이동 후 Main GameMode가 자동 시작에 사용합니다.
@@ -30,9 +32,11 @@ public:
 	void ClearChatHistory();
 
 private:
-	UPROPERTY()
-	FSIRoomSettings RoomSettings;
-	
+	// 세션 생성 완료를 받아 로비 맵을 listen으로 여는 지점
+	UFUNCTION()
+	void HandleCreateSessionComplete(bool bWasSuccessful);
+
+private:
 	UPROPERTY()
 	bool bPendingMatchStart = false;
 	

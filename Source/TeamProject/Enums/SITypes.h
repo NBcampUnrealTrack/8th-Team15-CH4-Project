@@ -70,24 +70,4 @@ struct TEAMPROJECT_API FChatLogEntry
 	FString Message;
 };
 
-USTRUCT(BlueprintType)
-struct TEAMPROJECT_API FSIRoomSettings
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
-	FString RoomName;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
-	FString RoomPassword;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
-	bool bIsPrivate = false;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
-	int32 BuildTimeLimit = 120;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "RoomSettings")
-	int32 GuessTimeLimit = 30;
-	
-};
+// 방 설정은 FSICreateSessionParams(GameInstance/SISessionSubsystem.h)로 일원화됨.
