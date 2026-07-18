@@ -32,7 +32,7 @@ void USISessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	
-	PrintNS(TEXT("Subsystem Initialized"));
+	// PrintNS(TEXT("Subsystem Initialized"));
 	
 	if (GEngine)
 	{
@@ -50,7 +50,7 @@ void USISessionSubsystem::Deinitialize()
 	// GameInstance 종료 시 좀비 세션 방지 — 이전 프로젝트의 Shutdown() 역할이 여기로 이사
 	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
 	{
-		PrintNS(TEXT("Deinitialize: Destroying leftover session"));
+		// PrintNS(TEXT("Deinitialize: Destroying leftover session"));
 		SessionInterface->DestroySession(NAME_GameSession);
 	}
 	
@@ -177,11 +177,11 @@ void USISessionSubsystem::FindSessions(int32 MaxSearchResults)
 		SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(
 			FOnFindSessionsCompleteDelegate::CreateUObject(this, &USISessionSubsystem::OnFindSessionsComplete));
 
-	PrintNS(TEXT("Searching for sessions..."));
+	// PrintNS(TEXT("Searching for sessions..."));
 	if (!SessionInterface->FindSessions(0, SessionSearch.ToSharedRef()))
 	{
 		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
-		PrintNS(TEXT("FindSessions request REJECTED"), FColor::Red);
+		// PrintNS(TEXT("FindSessions request REJECTED"), FColor::Red);
 		OnFindSessionsCompleteEvent.Broadcast({}, false);
 	}
 }
@@ -221,8 +221,8 @@ void USISessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		}
 	}
 
-	PrintNS(FString::Printf(TEXT("Find Complete: %s / Results: %d"),
-		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL"), Sessions.Num()));
+	// PrintNS(FString::Printf(TEXT("Find Complete: %s / Results: %d"),
+	// 	bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL"), Sessions.Num()));
 
 	OnFindSessionsCompleteEvent.Broadcast(Sessions, bWasSuccessful);
 }
@@ -249,7 +249,7 @@ void USISessionSubsystem::UpdateHostSessionParams(const FSICreateSessionParams& 
 	CurrentSettings->Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
-	PrintNS(FString::Printf(TEXT("Room settings updated: %s"), *PendingParams.RoomTitle));
+	// PrintNS(FString::Printf(TEXT("Room settings updated: %s"), *PendingParams.RoomTitle));
 
 	SessionInterface->UpdateSession(NAME_GameSession, *CurrentSettings, true);
 }
@@ -280,7 +280,7 @@ void USISessionSubsystem::SetSessionInProgress(const bool bInProgress)
 	CurrentSettings->Set(KEY_IN_PROGRESS, bInProgress ? 1 : 0,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
-	PrintNS(FString::Printf(TEXT("Session state -> %s"), bInProgress ? TEXT("IN PROGRESS") : TEXT("WAITING")));
+	// PrintNS(FString::Printf(TEXT("Session state -> %s"), bInProgress ? TEXT("IN PROGRESS") : TEXT("WAITING")));
 
 	SessionInterface->UpdateSession(NAME_GameSession, *CurrentSettings, true);
 }
@@ -299,7 +299,7 @@ void USISessionSubsystem::JoinSessionByIndex(int32 SearchResultIndex, const FStr
 
 	if (!SessionSearch.IsValid() || !SessionSearch->SearchResults.IsValidIndex(SearchResultIndex))
 	{
-		PrintNS(FString::Printf(TEXT("Join FAIL: invalid index %d"), SearchResultIndex), FColor::Red);
+		// PrintNS(FString::Printf(TEXT("Join FAIL: invalid index %d"), SearchResultIndex), FColor::Red);
 		OnJoinSessionCompleteEvent.Broadcast(false);
 		return;
 	}
@@ -310,11 +310,11 @@ void USISessionSubsystem::JoinSessionByIndex(int32 SearchResultIndex, const FStr
 	
 	PendingJoinPassword = Password;   // private 멤버 FString 하나 추가해서 보관
 
-	PrintNS(FString::Printf(TEXT("Joining session [%d]..."), SearchResultIndex));
+	// PrintNS(FString::Printf(TEXT("Joining session [%d]..."), SearchResultIndex));
 	if (!SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[SearchResultIndex]))
 	{
 		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
-		PrintNS(TEXT("JoinSession request REJECTED"), FColor::Red);
+		// PrintNS(TEXT("JoinSession request REJECTED"), FColor::Red);
 		OnJoinSessionCompleteEvent.Broadcast(false);
 	}
 }
@@ -325,12 +325,12 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 
 	if (Result != EOnJoinSessionCompleteResult::Success)
 	{
-		PrintNS(FString::Printf(TEXT("Join Complete: FAIL (%d)"), static_cast<int32>(Result)), FColor::Red);
+		// PrintNS(FString::Printf(TEXT("Join Complete: FAIL (%d)"), static_cast<int32>(Result)), FColor::Red);
 
 		// 실패 시 로컬에 등록된 세션 정리 → 재시도 가능하게 ("can't join twice" 방지)
 		if (SessionInterface->GetNamedSession(NAME_GameSession))
 		{
-			PrintNS(TEXT("Cleaning up local session after failed join"));
+			// PrintNS(TEXT("Cleaning up local session after failed join"));
 			DestroySession();
 		}
 		OnJoinSessionCompleteEvent.Broadcast(false);
@@ -340,7 +340,7 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 	APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController();
 	if (!PC)
 	{
-		PrintNS(TEXT("Travel FAIL: PlayerController null"), FColor::Red);
+		// PrintNS(TEXT("Travel FAIL: PlayerController null"), FColor::Red);
 		OnJoinSessionCompleteEvent.Broadcast(false);
 		return;
 	}
@@ -348,7 +348,7 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 	FString ConnectString;
 	if (!SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 	{
-		PrintNS(TEXT("Travel FAIL: could not resolve connect string"), FColor::Red);
+		// PrintNS(TEXT("Travel FAIL: could not resolve connect string"), FColor::Red);
 		OnJoinSessionCompleteEvent.Broadcast(false);
 		return;
 	}
@@ -359,7 +359,7 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 		ConnectString += FString::Printf(TEXT("?Password=%s"), *PendingJoinPassword);
 	}
 
-	PrintNS(FString::Printf(TEXT("Traveling to: %s"), *ConnectString), FColor::Green);
+	// PrintNS(FString::Printf(TEXT("Traveling to: %s"), *ConnectString), FColor::Green);
 	OnJoinSessionCompleteEvent.Broadcast(true);
 	PC->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
 }
@@ -380,11 +380,11 @@ void USISessionSubsystem::DestroySession()
 		SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(
 			FOnDestroySessionCompleteDelegate::CreateUObject(this, &USISessionSubsystem::OnDestroySessionComplete));
 
-	PrintNS(TEXT("Destroying session..."));
+	// PrintNS(TEXT("Destroying session..."));
 	if (!SessionInterface->DestroySession(NAME_GameSession))
 	{
 		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
-		PrintNS(TEXT("DestroySession request REJECTED"), FColor::Red);
+		// PrintNS(TEXT("DestroySession request REJECTED"), FColor::Red);
 		bCreateSessionOnDestroy = false;
 		OnDestroySessionCompleteEvent.Broadcast(false);
 	}
@@ -400,7 +400,7 @@ void USISessionSubsystem::LeaveSession()
 
 	if (!SessionInterface->GetNamedSession(NAME_GameSession))
 	{
-		PrintNS(TEXT("LeaveSession: no session to leave"));
+		// PrintNS(TEXT("LeaveSession: no session to leave"));
 		OnSessionLeftEvent.Broadcast(ESISessionLeaveReason::UserRequested);   // 정리할 게 없어도 "나갔다"는 사실은 방송
 		return;
 	}
@@ -413,7 +413,7 @@ void USISessionSubsystem::LeaveSession()
 void USISessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
 	SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
-	PrintNS(FString::Printf(TEXT("Destroy Complete: %s"), bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL")));
+	// PrintNS(FString::Printf(TEXT("Destroy Complete: %s"), bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL")));
 
 	OnDestroySessionCompleteEvent.Broadcast(bWasSuccessful);
 
@@ -439,13 +439,13 @@ void USISessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasS
 void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType,
 	const FString& ErrorString)
 {
-	PrintNS(FString::Printf(TEXT("Network Failure: %s"), *ErrorString), FColor::Red);
+	// PrintNS(FString::Printf(TEXT("Network Failure: %s"), *ErrorString), FColor::Red);
 
 	// 0) 내가 스스로 나가는 중이라면 그때 발생하는 연결 해제는 "실패"가 아니다.
 	//    기록해두면 메인메뉴에서 엉뚱하게 "연결이 끊어졌습니다" 안내가 뜬다.
 	if (bLeaveInProgress && PendingLeaveReason == ESISessionLeaveReason::UserRequested)
 	{
-		PrintNS(TEXT("Ignoring failure — voluntary leave in progress"));
+		// PrintNS(TEXT("Ignoring failure — voluntary leave in progress"));
 		return;
 	}
 
