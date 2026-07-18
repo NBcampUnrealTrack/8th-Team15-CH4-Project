@@ -187,6 +187,10 @@ protected:
 	// GEngine->OnNetworkFailure() 콜백
 	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver,
 		ENetworkFailure::Type FailureType, const FString& ErrorString);
+
+	/** 맵 로딩 완료 = 입장 시도가 끝났다는 뜻. bJoinInProgress를 내린다.
+		이 시점의 World는 확정된 상태라 소유 GameInstance 비교를 신뢰할 수 있다. */
+	void HandlePostLoadMap(UWorld* LoadedWorld);
 	
 private:
 	/** 세션 인터페이스 지연 획득 (Initialize 시점엔 World가 아직 없을 수 있음) */
@@ -211,6 +215,11 @@ private:
 	
 	/** Join 시에 입력된 Password 입력값 보관 */
 	FString PendingJoinPassword;
+
+	/** 이 인스턴스가 직접 입장을 시도했는가.
+		OnNetworkFailure는 엔진 전역이라 PIE에서 남의 실패까지 전부 흘러들어온다.
+		"내가 참가하기를 눌렀다"는 건 우리만 아는 사실이므로 이걸 기준으로 걸러낸다. */
+	bool bJoinInProgress = false;
 
 	/** bReturnToMainMenuOnDestroy 를 대체 — "나가는 중" 상태와 이유 */
 	bool bLeaveInProgress = false;

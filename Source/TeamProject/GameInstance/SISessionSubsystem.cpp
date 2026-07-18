@@ -7,6 +7,9 @@
 #include "OnlineSubsystemUtils.h"
 #include "Online/OnlineSessionNames.h"
 
+#include "Engine/NetDriver.h"
+#include "Engine/World.h"
+
 // 커스텀 세션 데이터 키 — 오타 방지를 위해 상수로 한 곳에
 static const FName KEY_ROOM_TITLE(TEXT("SI_ROOM_TITLE"));
 static const FName KEY_HAS_PASSWORD(TEXT("SI_HAS_PASSWORD"));
@@ -38,6 +41,17 @@ void USISessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		GEngine->OnNetworkFailure().AddUObject(this, &USISessionSubsystem::HandleNetworkFailure);
 	}
+
+	FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &USISessionSubsystem::HandlePostLoadMap);
+}
+
+void USISessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+	// 내 GameInstance의 맵이 올라왔다 = 입장 시도가 끝났다(성공했든 되돌아왔든)
+	if (LoadedWorld && LoadedWorld->GetGameInstance() == GetGameInstance())
+	{
+		bJoinInProgress = false;
+	}
 }
 
 void USISessionSubsystem::Deinitialize()
@@ -46,6 +60,8 @@ void USISessionSubsystem::Deinitialize()
 	{
 		GEngine->OnNetworkFailure().RemoveAll(this);   // 구독-해제 짝 규칙, 여기서도
 	}
+
+	FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
 	
 	// GameInstance 종료 시 좀비 세션 방지 — 이전 프로젝트의 Shutdown() 역할이 여기로 이사
 	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
@@ -53,7 +69,12 @@ void USISessionSubsystem::Deinitialize()
 		// PrintNS(TEXT("Deinitialize: Destroying leftover session"));
 		SessionInterface->DestroySession(NAME_GameSession);
 	}
-	
+
+	// 참조를 놓지 않으면 FOnlineSubsystemNull::Shutdown의 IsUnique() ensure에 걸린다.
+	// (PIE 종료 때마다 "Ensure condition failed: SessionInterface.IsUnique()")
+	SessionSearch.Reset();
+	SessionInterface.Reset();
+
 	Super::Deinitialize();
 }
 
@@ -309,12 +330,14 @@ void USISessionSubsystem::JoinSessionByIndex(int32 SearchResultIndex, const FStr
 			FOnJoinSessionCompleteDelegate::CreateUObject(this, &USISessionSubsystem::OnJoinSessionComplete));
 	
 	PendingJoinPassword = Password;   // private 멤버 FString 하나 추가해서 보관
+	bJoinInProgress = true;           // 이제부터 오는 접속 거절은 "내 것"이다
 
 	// PrintNS(FString::Printf(TEXT("Joining session [%d]..."), SearchResultIndex));
 	if (!SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[SearchResultIndex]))
 	{
 		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
 		// PrintNS(TEXT("JoinSession request REJECTED"), FColor::Red);
+		bJoinInProgress = false;
 		OnJoinSessionCompleteEvent.Broadcast(false);
 	}
 }
@@ -333,6 +356,7 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 			// PrintNS(TEXT("Cleaning up local session after failed join"));
 			DestroySession();
 		}
+		bJoinInProgress = false;
 		OnJoinSessionCompleteEvent.Broadcast(false);
 		return;
 	}
@@ -341,6 +365,7 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 	if (!PC)
 	{
 		// PrintNS(TEXT("Travel FAIL: PlayerController null"), FColor::Red);
+		bJoinInProgress = false;
 		OnJoinSessionCompleteEvent.Broadcast(false);
 		return;
 	}
@@ -349,6 +374,7 @@ void USISessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessio
 	if (!SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 	{
 		// PrintNS(TEXT("Travel FAIL: could not resolve connect string"), FColor::Red);
+		bJoinInProgress = false;
 		OnJoinSessionCompleteEvent.Broadcast(false);
 		return;
 	}
@@ -406,6 +432,7 @@ void USISessionSubsystem::LeaveSession()
 	}
 
 	bLeaveInProgress = true;
+	bJoinInProgress = false;
 	PendingLeaveReason = ESISessionLeaveReason::UserRequested;
 	DestroySession();
 }
@@ -441,7 +468,17 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 {
 	// PrintNS(FString::Printf(TEXT("Network Failure: %s"), *ErrorString), FColor::Red);
 
-	// 0) 내가 스스로 나가는 중이라면 그때 발생하는 연결 해제는 "실패"가 아니다.
+	// 0) 접속 거절(PendingConnectionFailure)은 "내가 참가하기를 누른 경우"에만 내 일이다.
+	//    OnNetworkFailure는 엔진 전역 델리게이트라 PIE에서 클라를 여러 개 띄우면
+	//    GameInstance마다 있는 이 서브시스템 전부에게 남의 실패까지 배달된다.
+	//    콜백이 주는 World 인자는 아직 월드가 확정되기 전(PendingNetGame)이라 믿을 수 없어서,
+	//    우리만 아는 사실인 "내가 시도했다"(bJoinInProgress)를 기준으로 삼는다.
+	if (FailureType == ENetworkFailure::PendingConnectionFailure && !bJoinInProgress)
+	{
+		return;
+	}
+
+	// 1) 내가 스스로 나가는 중이라면 그때 발생하는 연결 해제는 "실패"가 아니다.
 	//    기록해두면 메인메뉴에서 엉뚱하게 "연결이 끊어졌습니다" 안내가 뜬다.
 	if (bLeaveInProgress && PendingLeaveReason == ESISessionLeaveReason::UserRequested)
 	{
@@ -449,7 +486,7 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 		return;
 	}
 
-	// 1) 실패를 의미 단위로 분류
+	// 2) 실패를 의미 단위로 분류
 	ESIConnectionFailureType Classified = ESIConnectionFailureType::Unknown;
 	if (FailureType == ENetworkFailure::PendingConnectionFailure
 		&& ErrorString.Contains(SISessionErrors::WrongPassword))   // 상수 안 쓰면 TEXT("Incorrect password")
@@ -462,14 +499,32 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 		Classified = ESIConnectionFailureType::ConnectionLost;
 	}
 
-	// 2) 우편함에 보관 (후속 실패가 덮어써도 무해)
+	// 3) 우편함에 보관 (후속 실패가 덮어써도 무해)
 	LastFailureType = Classified;
 	LastFailureRawMessage = ErrorString;
 	bHasPendingFailure = true;
 
-	// 3) 세션 정리 + 나감 통지 예약 — 세션이 "있을 때만"
+	const bool bHasLiveSession =
+		SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession) != nullptr;
+
+	// 4) 접속 거절은 엔진이 알아서 기본 맵으로 되돌린다("Connection failed; returning to Entry").
+	//    우리까지 OpenLevel을 부르면 맵을 두 번 로드하게 되므로, 세션 정리만 하고 빠진다.
+	//    안내는 메인메뉴 도착 후 ConsumeLastFailure를 읽는 쪽이 담당한다.
+	if (FailureType == ENetworkFailure::PendingConnectionFailure)
+	{
+		bJoinInProgress = false;
+
+		if (bHasLiveSession)
+		{
+			DestroySession();   // bLeaveInProgress를 세우지 않는다 = 우리 쪽 복귀 처리 없음
+		}
+
+		return;
+	}
+
+	// 5) 그 밖의 실패는 이미 방 안에 있다가 끊긴 것 — 세션 정리 후 메인메뉴로 되돌린다.
 	//    세션이 없다 = 이미 첫 실패가 정리/통지를 끝냈다는 뜻이므로, 후속 실패는 기록만 하고 조용히 무시
-	if (SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession))
+	if (bHasLiveSession)
 	{
 		bLeaveInProgress = true;
 		PendingLeaveReason = ESISessionLeaveReason::ConnectionLost;
