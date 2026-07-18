@@ -21,6 +21,33 @@ void ASIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(ASIGameState, CurrentWorkspaceOwner);
 	DOREPLIFETIME(ASIGameState, CurrentRound);
 	DOREPLIFETIME(ASIGameState, TotalRounds);
+	DOREPLIFETIME(ASIGameState, LobbyRoomTitle);
+	DOREPLIFETIME(ASIGameState, LobbyMaxPlayers);
+	DOREPLIFETIME(ASIGameState, LobbyBuildTime);
+	DOREPLIFETIME(ASIGameState, LobbyGuessTime);
+}
+
+void ASIGameState::OnRep_LobbyRoomInfo()
+{
+	OnLobbyRoomInfoChanged.Broadcast();
+}
+
+void ASIGameState::SetLobbyRoomInfo(const FString& InRoomTitle, const int32 InMaxPlayers,
+	const float InBuildTime, const float InGuessTime)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	LobbyRoomTitle = InRoomTitle;
+	LobbyMaxPlayers = InMaxPlayers;
+	LobbyBuildTime = InBuildTime;
+	LobbyGuessTime = InGuessTime;
+
+	// 리슨 서버(호스트)에는 OnRep이 호출되지 않으므로 직접 알립니다.
+	OnRep_LobbyRoomInfo();
+	ForceNetUpdate();
 }
 
 void ASIGameState::SetGamePhase(const ESIGamePhase NewPhase)

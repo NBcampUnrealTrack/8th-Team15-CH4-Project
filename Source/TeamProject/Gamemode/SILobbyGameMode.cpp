@@ -90,9 +90,26 @@ void ASILobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	ASIGameState* SIState = GetGameState<ASIGameState>();
+	if (!SIState)
 	{
-		SIState->SetGamePhase(ESIGamePhase::LobbyPhase);
+		return;
+	}
+
+	SIState->SetGamePhase(ESIGamePhase::LobbyPhase);
+
+	// 호스트 GameInstance가 보관 중인 방 설정을 GameState로 옮겨 클라이언트 UI까지 도달시킵니다.
+	if (const UGameInstance* GameInstanceRef = GetGameInstance())
+	{
+		if (USISessionSubsystem* Subsystem = GameInstanceRef->GetSubsystem<USISessionSubsystem>())
+		{
+			const FSICreateSessionParams& HostParams = Subsystem->GetHostSessionParams();
+			SIState->SetLobbyRoomInfo(
+				HostParams.RoomTitle, HostParams.MaxPlayers, HostParams.BuildTime, HostParams.GuessTime);
+
+			// 로비에 있다 = 대기중. 게임이 끝나고 돌아온 경우까지 여기서 함께 처리된다.
+			Subsystem->SetSessionInProgress(false);
+		}
 	}
 }
 
@@ -155,6 +172,53 @@ void ASILobbyGameMode::AssignHostIfNeeded()
 	if (!bHasHost && FirstPlayerState)
 	{
 		FirstPlayerState->SetIsHost(true);
+	}
+}
+
+void ASILobbyGameMode::UpdateRoomSettings(ASIPlayerState* RequestingPlayerState, const FString& RoomTitle,
+	const FString& Password, const float BuildTime, const float GuessTime)
+{
+	// 이미 게임 시작이 예약됐으면 설정 변경을 받지 않는다 (travel 직전 값이 흔들리는 것 방지)
+	if (bTravelRequested || !IsValid(RequestingPlayerState) || !RequestingPlayerState->bIsHost)
+	{
+		return;
+	}
+
+	UGameInstance* GameInstanceRef = GetGameInstance();
+	USISessionSubsystem* Subsystem =
+		GameInstanceRef ? GameInstanceRef->GetSubsystem<USISessionSubsystem>() : nullptr;
+	if (!Subsystem)
+	{
+		return;
+	}
+
+	// 기존 값에서 출발해 UI가 보낸 항목만 덮어쓴다 (MaxPlayers처럼 UI에 없는 필드 보존)
+	FSICreateSessionParams NewParams = Subsystem->GetHostSessionParams();
+
+	// 방 제목이 비면 기존 제목을 유지한다 — 목록에 이름 없는 방이 뜨는 걸 막는다
+	if (!RoomTitle.IsEmpty())
+	{
+		NewParams.RoomTitle = RoomTitle;
+	}
+
+	NewParams.Password = Password;
+
+	// 0 이하 = "미지정" 센티널이라 그대로 통과시킨다. 지정된 값만 상식 범위로 자른다.
+	NewParams.BuildTime = BuildTime > 0.0f
+		? FMath::Clamp(BuildTime, SIRoomSettingLimits::MinBuildTime, SIRoomSettingLimits::MaxBuildTime)
+		: 0.0f;
+
+	NewParams.GuessTime = GuessTime > 0.0f
+		? FMath::Clamp(GuessTime, SIRoomSettingLimits::MinGuessTime, SIRoomSettingLimits::MaxGuessTime)
+		: 0.0f;
+
+	Subsystem->UpdateHostSessionParams(NewParams);
+
+	// 복제해서 참가자 UI까지 반영 (비밀번호는 복제하지 않는다)
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	{
+		SIState->SetLobbyRoomInfo(
+			NewParams.RoomTitle, NewParams.MaxPlayers, NewParams.BuildTime, NewParams.GuessTime);
 	}
 }
 

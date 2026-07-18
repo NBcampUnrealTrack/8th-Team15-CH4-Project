@@ -37,6 +37,8 @@ private:
 private:
 	virtual void ReceivedPlayer() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	virtual void SetupInputComponent() override;
 
 #pragma endregion
@@ -67,6 +69,18 @@ private:
 	
 	UFUNCTION()
 	void OnCreateRoomClicked(const FSICreateSessionParams& Settings);
+
+	/** 방 생성 결과 — 실패했을 때만 안내한다 (성공 시엔 GameInstance가 로비를 연다) */
+	UFUNCTION()
+	void HandleCreateSessionResult(bool bWasSuccessful);
+
+	/** 직전에 방에서 튕겨 나왔다면 그 사유를 안내창으로 띄운다 */
+	void ShowPendingFailureNotice();
+
+	/** 확인 버튼 하나짜리 안내창을 띄운다 */
+	void ShowNotice(const FText& Message);
+
+	static FText MakeFailureMessage(ESIConnectionFailureType FailureType);
 	
 #pragma endregion
 

@@ -66,6 +66,22 @@ void ASIPlayerState::OnRep_CurrentScore()
 // 호스트 게임 시작 요청 로직 (Server RPC)
 // ----------------------------------------------------
 
+void ASIPlayerState::Server_UpdateRoomSettings_Implementation(const FString& RoomTitle, const FString& Password,
+	const float BuildTime, const float GuessTime)
+{
+	// 위젯에서 이미 막고 있지만, RPC는 누구나 부를 수 있으므로 서버가 다시 확인한다
+	if (!bIsHost)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Server] 호스트 권한이 없는 플레이어가 방 설정 변경을 시도했습니다."));
+		return;
+	}
+
+	if (ASILobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<ASILobbyGameMode>())
+	{
+		LobbyGameMode->UpdateRoomSettings(this, RoomTitle, Password, BuildTime, GuessTime);
+	}
+}
+
 void ASIPlayerState::Server_RequestStartGame_Implementation()
 {
 	// 서버 측에서 한 번 더 이 요청을 보낸 플레이어가 진짜 호스트가 맞는지 엄격하게 검증 

@@ -7,7 +7,6 @@
 #include "GameInstance/SISessionSubsystem.h"
 #include "SICreateRoomWidget.generated.h"
 
-class UCheckBox;
 class UButton;
 class UEditableText;
 
@@ -20,12 +19,6 @@ protected:
 	virtual void NativeConstruct() override;
 	
 private:
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UCheckBox> CheckBox_Public;
-
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UCheckBox> CheckBox_Private;
-	
 	UPROPERTY(Meta = (BindWidget))
 	TObjectPtr<UEditableText> EditableText_RoomName;
 	
@@ -44,8 +37,6 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Button_Create;
 
-	bool bIsPrivate = false;
-	
 public:
 	FSICreateSessionParams GetRoomSettings() const;
 	
@@ -55,10 +46,4 @@ private:
 
 	UFUNCTION()
 	void HandleCreateClicked();
-	
-	UFUNCTION()
-	void HandlePublicChecked(bool bIsChecked);
-
-	UFUNCTION()
-	void HandlePrivateChecked(bool bIsChecked);
 };

@@ -5,6 +5,48 @@
 
 #include "Kismet/GameplayStatics.h"
 
+namespace
+{
+	const TCHAR* MainMenuLevelPath = TEXT("/Game/Shape_It/Level/MainMenu");
+}
+
+void USIGameInstance::Init()
+{
+	Super::Init();
+
+	// 방을 벗어나는 경로는 여러 갈래(직접 나가기 / 호스트 이탈 / 타임아웃)지만
+	// 도착점은 하나뿐이라 GameInstance가 한 번만 구독해둔다. 레벨이 바뀌어도 살아남는다.
+	if (USISessionSubsystem* SessionSubsystem = GetSubsystem<USISessionSubsystem>())
+	{
+		SessionSubsystem->OnSessionLeftEvent.AddUniqueDynamic(this, &USIGameInstance::HandleSessionLeft);
+	}
+}
+
+void USIGameInstance::LeaveRoom()
+{
+	if (USISessionSubsystem* SessionSubsystem = GetSubsystem<USISessionSubsystem>())
+	{
+		SessionSubsystem->LeaveSession();
+		return;
+	}
+
+	// 서브시스템이 없으면 방송해줄 주체도 없으니 직접 복귀
+	UE_LOG(LogTemp, Error, TEXT("[GameInstance] LeaveRoom: SessionSubsystem 없음 — 메인메뉴로 직행"));
+	HandleSessionLeft(ESISessionLeaveReason::UserRequested);
+}
+
+void USIGameInstance::HandleSessionLeft(const ESISessionLeaveReason Reason)
+{
+	ClearChatHistory();
+	ConsumePendingMatch();
+
+	UE_LOG(LogTemp, Log, TEXT("[GameInstance] 방을 나감 (사유: %s) — 메인메뉴로 복귀"),
+		Reason == ESISessionLeaveReason::UserRequested ? TEXT("유저 요청") : TEXT("연결 끊김"));
+
+	// OpenLevel이 기존 접속을 끊어준다 (클라이언트/호스트 공통)
+	UGameplayStatics::OpenLevel(this, FName(MainMenuLevelPath));
+}
+
 void USIGameInstance::CreateRoom(const FSICreateSessionParams& NewRoomSettings)
 {
 	ClearChatHistory();
@@ -46,11 +88,9 @@ void USIGameInstance::HandleCreateSessionComplete(const bool bWasSuccessful)
 	);
 }
 
-void USIGameInstance::JoinRoom(const FString& Address)
+void USIGameInstance::PrepareForJoin()
 {
 	ClearChatHistory();
-
-	UGameplayStatics::OpenLevel(this, FName(*Address), false);
 }
 
 void USIGameInstance::PreparePendingMatch(const int32 InExpectedPlayerCount)

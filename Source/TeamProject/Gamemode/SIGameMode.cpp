@@ -109,6 +109,15 @@ void ASIGameMode::BeginPlay()
 			SIState->SetGamePhase(ESIGamePhase::LobbyPhase);
 		}
 	}
+
+	// 인게임 맵에 도착 = 게임중. 방 목록에 그렇게 표시된다.
+	if (UGameInstance* GameInstanceRef = GetGameInstance())
+	{
+		if (USISessionSubsystem* Subsystem = GameInstanceRef->GetSubsystem<USISessionSubsystem>())
+		{
+			Subsystem->SetSessionInProgress(true);
+		}
+	}
 }
 
 void ASIGameMode::PostLogin(APlayerController* NewPlayer)
@@ -383,11 +392,13 @@ void ASIGameMode::ApplyHostMatchSettings()
 	// 센티널(0 이하) = 미지정 → 기본값 유지. 지정됐어도 서버가 상식 범위로 clamp
 	if (HostParams.BuildTime > 0.0f)
 	{
-		BuildTimeLimit = FMath::Clamp(HostParams.BuildTime, 30.0f, 600.0f);
+		BuildTimeLimit = FMath::Clamp(HostParams.BuildTime,
+			SIRoomSettingLimits::MinBuildTime, SIRoomSettingLimits::MaxBuildTime);
 	}
 	if (HostParams.GuessTime > 0.0f)
 	{
-		GuessTimeLimit = FMath::Clamp(HostParams.GuessTime, 10.0f, 120.0f);
+		GuessTimeLimit = FMath::Clamp(HostParams.GuessTime,
+			SIRoomSettingLimits::MinGuessTime, SIRoomSettingLimits::MaxGuessTime);
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("[GameMode] Match settings: Build=%.0fs, Guess=%.0fs"),

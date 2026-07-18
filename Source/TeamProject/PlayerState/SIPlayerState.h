@@ -60,4 +60,10 @@ public:
 	// 호스트 UI에서 '게임 시작' 버튼을 눌렀을 때 서버에 게임 루프 시작을 요청하는 RPC 함수
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Lobby")
 	void Server_RequestStartGame();
+
+	// 호스트가 로비에서 방 설정을 수정했을 때 서버에 반영을 요청하는 RPC.
+	// 값 검증(권한/범위)은 전적으로 서버가 하며, 클라이언트 입력은 신뢰하지 않는다.
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Lobby")
+	void Server_UpdateRoomSettings(const FString& RoomTitle, const FString& Password,
+		float BuildTime, float GuessTime);
 };

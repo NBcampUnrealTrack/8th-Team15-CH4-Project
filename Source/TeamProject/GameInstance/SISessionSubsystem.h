@@ -12,6 +12,15 @@ namespace SISessionErrors
 	static const FString WrongPassword = TEXT("Incorrect password");
 }
 
+/** 방 설정 허용 범위 — 로비의 서버 검증과 GameMode의 적용이 같은 값을 봐야 한다 */
+namespace SIRoomSettingLimits
+{
+	static constexpr float MinBuildTime = 30.0f;
+	static constexpr float MaxBuildTime = 600.0f;
+	static constexpr float MinGuessTime = 10.0f;
+	static constexpr float MaxGuessTime = 120.0f;
+}
+
 /** 방 생성 시 UI에서 받아오는 설정 묶음 */
 USTRUCT(BlueprintType)
 struct FSICreateSessionParams
@@ -24,10 +33,7 @@ struct FSICreateSessionParams
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
 	int32 MaxPlayers = 8;
 
-	// UPROPERTY(BlueprintReadWrite, Category = "Session")
-	// bool bIsPrivate = false;
-
-	/** 광고하지 않음 — 호스트 측 검증용으로만 보관 */
+	/** 광고하지 않음 — 호스트 측 검증용으로만 보관. 비어 있으면 공개방 */
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
 	FString Password;
 	
@@ -55,12 +61,13 @@ struct FSISessionInfo
 	UPROPERTY(BlueprintReadOnly, Category = "Session")
 	int32 MaxPlayers = 0;
 
-	// UPROPERTY(BlueprintReadOnly, Category = "Session")
-	// bool bIsPrivate = false;
-	
 	/** 자물쇠 표시 + 입장 시 비번 입력창 노출 기준 */
 	UPROPERTY(BlueprintReadOnly, Category = "Session")
-	bool bHasPassword = false;       // ← bIsPrivate를 대체 (의미가 정확해짐)
+	bool bHasPassword = false;
+
+	/** true = 이미 게임이 진행 중인 방 (bAllowJoinInProgress라 입장 자체는 가능) */
+	UPROPERTY(BlueprintReadOnly, Category = "Session")
+	bool bIsInProgress = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Session")
 	FString HostName;
@@ -133,6 +140,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SI|Session")
 	void LeaveSession();
 	
+	/** 방이 게임 중인지를 세션에 광고한다 — 목록에 "게임중/대기중"으로 뜬다.
+		호스트에서만 의미가 있다(참가자는 세션 설정을 들고 있지 않아 조용히 무시됨).
+		각 GameMode가 BeginPlay에서 자기 상태를 선언하는 식으로 쓴다. */
+	UFUNCTION(BlueprintCallable, Category = "SI|Session")
+	void SetSessionInProgress(bool bInProgress);
+
+	/** 로비에서 호스트가 방 설정을 바꿨을 때 — 보관값(PendingParams)을 갈아끼우고
+		목록에 광고되는 방 제목/자물쇠 표시도 함께 갱신한다. 호스트에서만 의미가 있다. */
+	void UpdateHostSessionParams(const FSICreateSessionParams& NewParams);
+
 	/** PreLogin 검증용 — LobbyGameMode가 읽어감 */
 	UFUNCTION(BlueprintCallable, Category = "SI|Session")
 	const FSICreateSessionParams& GetHostSessionParams() const { return PendingParams; }

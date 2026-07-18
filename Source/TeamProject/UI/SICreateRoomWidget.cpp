@@ -3,23 +3,12 @@
 
 #include "UI/SICreateRoomWidget.h"
 
-#include "Components/CheckBox.h"
 #include "Components/Button.h"
 #include "Components/EditableText.h"
 
 void USICreateRoomWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-
-	if (CheckBox_Public)
-	{
-		CheckBox_Public->OnCheckStateChanged.AddDynamic(this, &USICreateRoomWidget::HandlePublicChecked);
-	}
-
-	if (CheckBox_Private)
-	{
-		CheckBox_Private->OnCheckStateChanged.AddDynamic(this, &USICreateRoomWidget::HandlePrivateChecked);
-	}
 
 	if (Button_Back)
 	{
@@ -47,8 +36,8 @@ FSICreateSessionParams USICreateRoomWidget::GetRoomSettings() const
 		Settings.RoomTitle = RoomTitle;
 	}
 
+	// 비밀번호가 비어 있으면 그대로 공개방 — 별도의 공개/비공개 플래그는 두지 않는다
 	Settings.Password = EditableText_RoomPassword->GetText().ToString();
-	Settings.bIsPrivate = bIsPrivate;
 
 	if (BuildTime > 0)
 	{
@@ -71,22 +60,4 @@ void USICreateRoomWidget::HandleBackClicked()
 void USICreateRoomWidget::HandleCreateClicked()
 {
 	HandleConfirmed();
-}
-
-void USICreateRoomWidget::HandlePublicChecked(bool bIsChecked)
-{
-	if (bIsChecked)
-	{
-		CheckBox_Private->SetIsChecked(false);
-		bIsPrivate = false;
-	}
-}
-
-void USICreateRoomWidget::HandlePrivateChecked(bool bIsChecked)
-{
-	if (bIsChecked)
-	{
-		CheckBox_Public->SetIsChecked(false);
-		bIsPrivate = true;
-	}
 }

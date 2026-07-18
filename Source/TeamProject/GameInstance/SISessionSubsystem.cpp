@@ -10,6 +10,7 @@
 // 커스텀 세션 데이터 키 — 오타 방지를 위해 상수로 한 곳에
 static const FName KEY_ROOM_TITLE(TEXT("SI_ROOM_TITLE"));
 static const FName KEY_HAS_PASSWORD(TEXT("SI_HAS_PASSWORD"));
+static const FName KEY_IN_PROGRESS(TEXT("SI_IN_PROGRESS"));
 
 #pragma region LOG
 
@@ -119,7 +120,7 @@ void USISessionSubsystem::CreateSessionInternal()
 	FOnlineSessionSettings SessionSettings;
 	SessionSettings.bIsLANMatch = true;   // Null = LAN. Steam 전환 시 서브시스템 이름 검사로 분기
 	SessionSettings.NumPublicConnections = PendingParams.MaxPlayers;
-	SessionSettings.bShouldAdvertise = true;	// bIsPrivate을 사용한 세션 공개 / 비공개 여부
+	SessionSettings.bShouldAdvertise = true;	// 모든 방은 목록에 노출된다. 입장 제한은 비밀번호로만 건다
 	SessionSettings.bUsesPresence = true;	// Null에선 무의미하지만 마이그레이션 대비
 	SessionSettings.bAllowJoinInProgress = true;
 	
@@ -127,6 +128,8 @@ void USISessionSubsystem::CreateSessionInternal()
 	SessionSettings.Set(KEY_ROOM_TITLE, PendingParams.RoomTitle,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 	SessionSettings.Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	SessionSettings.Set(KEY_IN_PROGRESS, 0,	// 갓 만든 방은 항상 대기중
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
 	CreateSessionCompleteDelegateHandle =
@@ -206,6 +209,10 @@ void USISessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 			R.Session.SessionSettings.Get(KEY_HAS_PASSWORD, HasPasswordInt );
 			Info.bHasPassword = (HasPasswordInt  != 0);
 
+			int32 InProgressInt = 0;
+			R.Session.SessionSettings.Get(KEY_IN_PROGRESS, InProgressInt);
+			Info.bIsInProgress = (InProgressInt != 0);
+
 			// 인원: 최대 - 남은 슬롯 = 현재 인원
 			Info.MaxPlayers = R.Session.SessionSettings.NumPublicConnections;
 			Info.CurrentPlayers = Info.MaxPlayers - R.Session.NumOpenPublicConnections;
@@ -218,6 +225,64 @@ void USISessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL"), Sessions.Num()));
 
 	OnFindSessionsCompleteEvent.Broadcast(Sessions, bWasSuccessful);
+}
+
+void USISessionSubsystem::UpdateHostSessionParams(const FSICreateSessionParams& NewParams)
+{
+	// 보관값은 항상 갱신한다 — PreLogin 비번 검증과 인게임 시간 적용이 이걸 읽는다
+	PendingParams = NewParams;
+
+	if (!EnsureSessionInterface())
+	{
+		return;
+	}
+
+	// 광고 갱신은 세션이 실제로 있을 때만 (호스트 아니면 원본이 없다)
+	FOnlineSessionSettings* CurrentSettings = SessionInterface->GetSessionSettings(NAME_GameSession);
+	if (!CurrentSettings)
+	{
+		return;
+	}
+
+	CurrentSettings->Set(KEY_ROOM_TITLE, PendingParams.RoomTitle,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	CurrentSettings->Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+
+	PrintNS(FString::Printf(TEXT("Room settings updated: %s"), *PendingParams.RoomTitle));
+
+	SessionInterface->UpdateSession(NAME_GameSession, *CurrentSettings, true);
+}
+
+void USISessionSubsystem::SetSessionInProgress(const bool bInProgress)
+{
+	if (!EnsureSessionInterface())
+	{
+		return;
+	}
+
+	// 호스트만 세션 설정의 원본을 들고 있다. 참가자는 여기서 조용히 빠져나간다.
+	FOnlineSessionSettings* CurrentSettings = SessionInterface->GetSessionSettings(NAME_GameSession);
+	if (!CurrentSettings)
+	{
+		return;
+	}
+
+	int32 StoredValue = 0;
+	CurrentSettings->Get(KEY_IN_PROGRESS, StoredValue);
+
+	// 값이 그대로면 갱신 요청을 아낀다 (LAN 비콘 재방송 비용)
+	if ((StoredValue != 0) == bInProgress)
+	{
+		return;
+	}
+
+	CurrentSettings->Set(KEY_IN_PROGRESS, bInProgress ? 1 : 0,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+
+	PrintNS(FString::Printf(TEXT("Session state -> %s"), bInProgress ? TEXT("IN PROGRESS") : TEXT("WAITING")));
+
+	SessionInterface->UpdateSession(NAME_GameSession, *CurrentSettings, true);
 }
 
 #pragma endregion
@@ -375,6 +440,14 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 	const FString& ErrorString)
 {
 	PrintNS(FString::Printf(TEXT("Network Failure: %s"), *ErrorString), FColor::Red);
+
+	// 0) 내가 스스로 나가는 중이라면 그때 발생하는 연결 해제는 "실패"가 아니다.
+	//    기록해두면 메인메뉴에서 엉뚱하게 "연결이 끊어졌습니다" 안내가 뜬다.
+	if (bLeaveInProgress && PendingLeaveReason == ESISessionLeaveReason::UserRequested)
+	{
+		PrintNS(TEXT("Ignoring failure — voluntary leave in progress"));
+		return;
+	}
 
 	// 1) 실패를 의미 단위로 분류
 	ESIConnectionFailureType Classified = ESIConnectionFailureType::Unknown;

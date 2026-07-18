@@ -22,6 +22,11 @@ public:
 
 	void RequestStartGame(ASIPlayerState* RequestingPlayerState);
 
+	/** 호스트가 로비에서 방 설정을 바꿨을 때의 서버측 처리 지점.
+		권한 검증 → 허용 범위로 clamp → 보관값(세션) 갱신 → GameState 복제 순으로 진행한다. */
+	void UpdateRoomSettings(ASIPlayerState* RequestingPlayerState, const FString& RoomTitle,
+		const FString& Password, float BuildTime, float GuessTime);
+
 protected:
 	virtual void BeginPlay() override;
 

@@ -15,6 +15,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnScoreboardUpdatedSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChatMessageSignature, const FChatMessagePayload&, Payload);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoinedSignature, class APlayerState*, JoinedPlayer);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeftSignature, class APlayerState*, LeftPlayer);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLobbyRoomInfoChangedSignature);
 
 
 class USoundBase;
@@ -61,6 +62,30 @@ public:
 
 	UPROPERTY(Replicated, Transient, BlueprintReadOnly, Category = "GameData")
 	int32 TotalRounds;
+
+	// ── 로비 방 설정 ──
+	// 원본은 호스트 GameInstance의 USISessionSubsystem::GetHostSessionParams().
+	// 클라이언트는 그 값을 알 방법이 없으므로 GameState가 복제해 UI에 전달합니다.
+	// (Password는 검증용이라 복제하지 않습니다 — 호스트만 자기 서브시스템에서 직접 읽습니다.)
+	UPROPERTY(ReplicatedUsing = OnRep_LobbyRoomInfo, Transient, BlueprintReadOnly, Category = "Lobby")
+	FString LobbyRoomTitle;
+
+	UPROPERTY(ReplicatedUsing = OnRep_LobbyRoomInfo, Transient, BlueprintReadOnly, Category = "Lobby")
+	int32 LobbyMaxPlayers = 0;
+
+	UPROPERTY(ReplicatedUsing = OnRep_LobbyRoomInfo, Transient, BlueprintReadOnly, Category = "Lobby")
+	float LobbyBuildTime = 0.0f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_LobbyRoomInfo, Transient, BlueprintReadOnly, Category = "Lobby")
+	float LobbyGuessTime = 0.0f;
+
+	UFUNCTION()
+	void OnRep_LobbyRoomInfo();
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnLobbyRoomInfoChangedSignature OnLobbyRoomInfoChanged;
+
+	void SetLobbyRoomInfo(const FString& InRoomTitle, int32 InMaxPlayers, float InBuildTime, float InGuessTime);
 
 	// 서버에서 값을 변경하면서 Listen Server의 로컬 UI에도 즉시 알립니다.
 	void SetGamePhase(ESIGamePhase NewPhase);

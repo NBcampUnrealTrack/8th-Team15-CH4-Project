@@ -8,6 +8,7 @@
 #include "GameInstance/SIGameInstance.h"
 #include "UI/SICreateRoomWidget.h"
 #include "UI/SIMainMenuWidget.h"
+#include "UI/SINoticeWidget.h"
 
 ASITitlePlayerController::ASITitlePlayerController()
 {
@@ -42,6 +43,13 @@ void ASITitlePlayerController::ReceivedPlayer()
 
 	UIManagerComponent->OnCreateRoomRequested.AddDynamic(this, &ASITitlePlayerController::OnCreateRoomClicked);
 
+	// 생성 성공 시 로비를 여는 건 GameInstance 몫. 여기선 실패 안내만 담당한다.
+	if (USISessionSubsystem* Subsystem = GetGameInstance()->GetSubsystem<USISessionSubsystem>())
+	{
+		Subsystem->OnCreateSessionCompleteEvent.AddUniqueDynamic(
+			this, &ASITitlePlayerController::HandleCreateSessionResult);
+	}
+
 	TObjectPtr<USIMainMenuWidget> MainMenuWidget = CreateWidget<USIMainMenuWidget>(this, MainMenuWidgetClass);
 
 	if (!IsValid(MainMenuWidget))
@@ -54,6 +62,90 @@ void ASITitlePlayerController::ReceivedPlayer()
 	MainMenuWidget->OnClickedQuitButton.AddDynamic(this, &ASITitlePlayerController::HandleQuit);
 
 	MainMenuWidget->AddToViewport();
+
+	// 메인메뉴가 올라온 뒤에 안내창을 얹어야 스택 순서가 맞다
+	ShowPendingFailureNotice();
+}
+
+void ASITitlePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UGameInstance* GameInstanceRef = GetGameInstance())
+	{
+		if (USISessionSubsystem* Subsystem = GameInstanceRef->GetSubsystem<USISessionSubsystem>())
+		{
+			Subsystem->OnCreateSessionCompleteEvent.RemoveDynamic(
+				this, &ASITitlePlayerController::HandleCreateSessionResult);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void ASITitlePlayerController::HandleCreateSessionResult(const bool bWasSuccessful)
+{
+	if (bWasSuccessful)
+	{
+		return;
+	}
+
+	ShowNotice(FText::FromString(TEXT("방을 만들지 못했습니다. 잠시 후 다시 시도해주세요.")));
+}
+
+void ASITitlePlayerController::ShowNotice(const FText& Message)
+{
+	if (!IsValid(UIManagerComponent))
+	{
+		return;
+	}
+
+	USINoticeWidget* NoticeWidget = Cast<USINoticeWidget>(UIManagerComponent->OpenWidget(EUIType::Notice));
+
+	if (!IsValid(NoticeWidget))
+	{
+		return;
+	}
+
+	NoticeWidget->SetMessage(Message);
+}
+
+void ASITitlePlayerController::ShowPendingFailureNotice()
+{
+	USISessionSubsystem* Subsystem = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<USISessionSubsystem>()
+		: nullptr;
+
+	if (!IsValid(Subsystem))
+	{
+		return;
+	}
+
+	ESIConnectionFailureType FailureType = ESIConnectionFailureType::Unknown;
+	FString RawMessage;
+
+	// 우편함이 비어 있으면 정상 진입 — 아무것도 하지 않는다
+	if (!Subsystem->ConsumeLastFailure(FailureType, RawMessage))
+	{
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[Title] 직전 접속 실패: %s"), *RawMessage);
+
+	ShowNotice(MakeFailureMessage(FailureType));
+}
+
+FText ASITitlePlayerController::MakeFailureMessage(const ESIConnectionFailureType FailureType)
+{
+	switch (FailureType)
+	{
+	case ESIConnectionFailureType::WrongPassword:
+		return FText::FromString(TEXT("비밀번호가 일치하지 않습니다."));
+
+	case ESIConnectionFailureType::ConnectionLost:
+		return FText::FromString(TEXT("호스트가 방을 나갔거나 연결이 끊어졌습니다."));
+
+	default:
+		return FText::FromString(TEXT("방에 접속하지 못했습니다."));
+	}
 }
 
 void ASITitlePlayerController::SetupInputComponent()
@@ -92,8 +184,15 @@ void ASITitlePlayerController::HandleQuit()
 
 void ASITitlePlayerController::OnCreateRoomClicked(const FSICreateSessionParams& Settings)
 {
-	Cast<USIGameInstance>(GetGameInstance())->CreateRoom(Settings);
-	UE_LOG(LogTemp, Warning, TEXT("Called OnCreateRoomClicked"));
+	USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>();
+
+	if (!IsValid(SIInstance))
+	{
+		ShowNotice(FText::FromString(TEXT("방을 만들지 못했습니다.")));
+		return;
+	}
+
+	SIInstance->CreateRoom(Settings);
 }
 #pragma region Sound
 

@@ -32,20 +32,20 @@ void USIUIManagerComponent::OnWidgetConfirmed()
 	OnUIConfirmed.Broadcast(WidgetStack.Last().UIType);
 }
 
-void USIUIManagerComponent::OpenWidget(EUIType Type)
+USIUserWidget* USIUIManagerComponent::OpenWidget(EUIType Type)
 {
 	APlayerController* PC = Cast<APlayerController>(GetOwner());
 
 	if (!PC || !PC->IsLocalController())
 	{
-		return;
+		return nullptr;
 	}
 
 	TSubclassOf<USIUserWidget>* FoundClass = WidgetClasses.Find(Type);
 
 	if (!FoundClass || !*FoundClass)
 	{
-		return;
+		return nullptr;
 	}
 
 	if (WidgetStack.ContainsByPredicate(
@@ -55,14 +55,14 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 			}
 		))
 	{
-		return;
+		return nullptr;
 	}
 
 	TObjectPtr<USIUserWidget> NewWidget = CreateWidget<USIUserWidget>(PC, *FoundClass);
-	
+
 	if (!IsValid(NewWidget))
 	{
-		return;
+		return nullptr;
 	}
 
 	NewWidget->AddToViewport();
@@ -80,6 +80,8 @@ void USIUIManagerComponent::OpenWidget(EUIType Type)
 	UIStackEntry.Widget = NewWidget;
 
 	WidgetStack.Add(UIStackEntry);
+
+	return NewWidget;
 }
 
 void USIUIManagerComponent::CloseWidget()

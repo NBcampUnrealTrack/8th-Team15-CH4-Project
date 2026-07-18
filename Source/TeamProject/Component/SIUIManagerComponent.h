@@ -16,6 +16,7 @@ enum class EUIType : uint8
 	CreateRoom,		// 방 만들기 설정
 	RoomList,		// 방 목록
 	LobbySetting,	// 방 설정 (로비 내)
+	Notice,			// 확인 버튼 하나짜리 안내창
 };
 
 USTRUCT()
@@ -73,7 +74,8 @@ private:
 	TArray<FUIStackEntry> WidgetStack;
 
 public:
-	void OpenWidget(EUIType Type);
+	/** 연 위젯을 돌려준다 — 문구 주입처럼 생성 직후 손볼 게 있을 때 쓴다. 실패/중복이면 nullptr */
+	USIUserWidget* OpenWidget(EUIType Type);
 
 	void CloseWidget();
 	
