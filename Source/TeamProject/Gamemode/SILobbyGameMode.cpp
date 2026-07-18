@@ -69,9 +69,9 @@ void ASILobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 	const FSICreateSessionParams& HostParams = Subsystem->GetHostSessionParams();
 	
 	// 공개 방 — 검증 없음
-	if (!HostParams.bIsPrivate)
+	if (HostParams.Password.IsEmpty())
 	{
-		return;   
+		return;		// 비밀번호 없는 방 — 검증 없음
 	}
 
 	// 클라이언트가 URL에 실어 보낸 값 추출

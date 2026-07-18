@@ -24,8 +24,8 @@ struct FSICreateSessionParams
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
 	int32 MaxPlayers = 8;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Session")
-	bool bIsPrivate = false;
+	// UPROPERTY(BlueprintReadWrite, Category = "Session")
+	// bool bIsPrivate = false;
 
 	/** 광고하지 않음 — 호스트 측 검증용으로만 보관 */
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
@@ -55,8 +55,12 @@ struct FSISessionInfo
 	UPROPERTY(BlueprintReadOnly, Category = "Session")
 	int32 MaxPlayers = 0;
 
+	// UPROPERTY(BlueprintReadOnly, Category = "Session")
+	// bool bIsPrivate = false;
+	
+	/** 자물쇠 표시 + 입장 시 비번 입력창 노출 기준 */
 	UPROPERTY(BlueprintReadOnly, Category = "Session")
-	bool bIsPrivate = false;
+	bool bHasPassword = false;       // ← bIsPrivate를 대체 (의미가 정확해짐)
 
 	UPROPERTY(BlueprintReadOnly, Category = "Session")
 	FString HostName;

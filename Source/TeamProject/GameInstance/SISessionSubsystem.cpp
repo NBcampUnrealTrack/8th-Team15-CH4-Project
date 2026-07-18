@@ -9,7 +9,7 @@
 
 // 커스텀 세션 데이터 키 — 오타 방지를 위해 상수로 한 곳에
 static const FName KEY_ROOM_TITLE(TEXT("SI_ROOM_TITLE"));
-static const FName KEY_IS_PRIVATE(TEXT("SI_IS_PRIVATE"));
+static const FName KEY_HAS_PASSWORD(TEXT("SI_HAS_PASSWORD"));
 
 #pragma region LOG
 
@@ -119,14 +119,14 @@ void USISessionSubsystem::CreateSessionInternal()
 	FOnlineSessionSettings SessionSettings;
 	SessionSettings.bIsLANMatch = true;   // Null = LAN. Steam 전환 시 서브시스템 이름 검사로 분기
 	SessionSettings.NumPublicConnections = PendingParams.MaxPlayers;
-	SessionSettings.bShouldAdvertise = true;	// 비공개 방도 목록엔 보여야 하므로 항상 true
+	SessionSettings.bShouldAdvertise = true;	// bIsPrivate을 사용한 세션 공개 / 비공개 여부
 	SessionSettings.bUsesPresence = true;	// Null에선 무의미하지만 마이그레이션 대비
 	SessionSettings.bAllowJoinInProgress = true;
 	
 	// ── 커스텀 데이터 광고: 검색자가 목록에서 볼 정보만. Password는 절대 넣지 않는다 ──
 	SessionSettings.Set(KEY_ROOM_TITLE, PendingParams.RoomTitle,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
-	SessionSettings.Set(KEY_IS_PRIVATE, PendingParams.bIsPrivate ? 1 : 0,
+	SessionSettings.Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
 	CreateSessionCompleteDelegateHandle =
@@ -202,9 +202,9 @@ void USISessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 			// 커스텀 데이터 추출 — 호스트가 광고한 값 꺼내기
 			R.Session.SessionSettings.Get(KEY_ROOM_TITLE, Info.RoomTitle);
-			int32 IsPrivateInt = 0;
-			R.Session.SessionSettings.Get(KEY_IS_PRIVATE, IsPrivateInt);
-			Info.bIsPrivate = (IsPrivateInt != 0);
+			int32 HasPasswordInt = 0;
+			R.Session.SessionSettings.Get(KEY_HAS_PASSWORD, HasPasswordInt );
+			Info.bHasPassword = (HasPasswordInt  != 0);
 
 			// 인원: 최대 - 남은 슬롯 = 현재 인원
 			Info.MaxPlayers = R.Session.SessionSettings.NumPublicConnections;
