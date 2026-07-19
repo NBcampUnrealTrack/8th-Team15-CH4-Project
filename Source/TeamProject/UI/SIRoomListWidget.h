@@ -86,6 +86,9 @@ private:
 	void HandleJoinSessionComplete(bool bWasSuccessful);
 
 private:
+	/** 키보드 포커스를 이 위젯으로 가져온다. Slate 트리에 붙은 뒤(= Construct 다음 틱)에 불러야 먹는다. */
+	void FocusForKeyboardShortcuts();
+
 	void RefreshRoomList();
 
 	/** 캐시된 검색 결과를 현재 검색어로 걸러 목록을 다시 그린다 */

@@ -48,11 +48,35 @@ void USIRoomListWidget::NativeConstruct()
 
 	UpdateJoinControls();
 
-	// F5를 받으려면 키보드 포커스가 이 위젯 트리 안에 있어야 한다
-	SetKeyboardFocus();
+	// F5를 받으려면 키보드 포커스가 이 위젯 트리 안에 있어야 한다.
+	// Construct 시점엔 아직 Slate 트리에 붙기 전이라 여기서 포커스를 요청하면 조용히 무시된다.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateWeakLambda(this, [this]()
+			{
+				FocusForKeyboardShortcuts();
+			}));
+	}
 
 	// 목록을 열자마자 한 번 검색
 	RefreshRoomList();
+}
+
+void USIRoomListWidget::FocusForKeyboardShortcuts()
+{
+	APlayerController* PC = GetOwningPlayer();
+	if (!PC || !IsInViewport())
+	{
+		return;
+	}
+
+	// 이 화면은 UI만 다루므로 GameAndUI가 아니라 UIOnly.
+	// GameAndUI면 아무 데나 클릭하는 순간 포커스가 게임 뷰포트로 돌아가 F5가 다시 안 먹는다.
+	FInputModeUIOnly InputMode;
+	InputMode.SetWidgetToFocus(TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	PC->SetInputMode(InputMode);
 }
 
 FReply USIRoomListWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
