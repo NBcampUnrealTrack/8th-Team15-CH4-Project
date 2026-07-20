@@ -10,6 +10,10 @@
 namespace SISessionErrors
 {
 	static const FString WrongPassword = TEXT("Incorrect password");
+
+	/** 이미 시작된 매치에 뒤늦게 붙으려 할 때. 서버가 PreLogin에서 채우고,
+		클라이언트는 HandleNetworkFailure에서 이 문자열을 보고 사유를 분류한다. */
+	static const FString GameInProgress = TEXT("Game already in progress");
 }
 
 /** 방 설정 허용 범위 — 로비의 서버 검증과 GameMode의 적용이 같은 값을 봐야 한다 */
@@ -93,6 +97,7 @@ enum class ESIConnectionFailureType : uint8
 {
 	WrongPassword    UMETA(DisplayName = "비밀번호 불일치"),
 	ConnectionLost   UMETA(DisplayName = "연결 끊김 (호스트 이탈 등)"),
+	GameInProgress   UMETA(DisplayName = "이미 시작된 게임 (중도 참여 불가)"),
 	Unknown          UMETA(DisplayName = "기타 오류")
 };
 

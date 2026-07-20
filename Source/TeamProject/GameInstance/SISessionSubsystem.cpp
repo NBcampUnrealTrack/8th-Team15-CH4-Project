@@ -8,6 +8,8 @@
 #include "OnlineSubsystemUtils.h"
 #include "Online/OnlineSessionNames.h"
 
+#include "Misc/Base64.h"	// 한글 방 제목 우회
+
 #include "Engine/NetDriver.h"
 #include "Engine/World.h"
 
@@ -15,6 +17,35 @@
 static const FName KEY_ROOM_TITLE(TEXT("SI_ROOM_TITLE"));
 static const FName KEY_HAS_PASSWORD(TEXT("SI_HAS_PASSWORD"));
 static const FName KEY_IN_PROGRESS(TEXT("SI_IN_PROGRESS"));
+
+/** ── 한글 방 제목 우회 (UE 5.5 OnlineSubsystemSteam 인코딩 버그) ──
+	스팀 로비 데이터의 왕복 인코딩이 어긋나 있다.
+	  쓰기: SetLobbyData(..., TCHAR_TO_UTF8(*Value))        → UTF-8
+	  읽기: SteamKeyToSessionSetting의 case 's'에서
+	        Setting.Data.SetValue(ANSI_TO_TCHAR(SteamValue)) → ANSI
+	그래서 ASCII 밖의 문자(한글 등)는 검색하는 쪽에서 깨진다.
+	(바로 옆 OwningUserName은 UTF8_TO_TCHAR를 제대로 써서 스팀 닉네임 한글은 멀쩡하다.)
+
+	해결: 광고할 땐 Base64로 감싸 ASCII로만 만들고, 읽을 때 되돌린다.
+	Base64 결과는 A-Z a-z 0-9 + / = 뿐이라 ANSI로 읽혀도 무손실이다.
+	두 함수는 반드시 짝으로 쓸 것. */
+static FString EncodeRoomTitleForAdvertising(const FString& RawTitle)
+{
+	return FBase64::Encode(RawTitle);
+}
+
+static FString DecodeAdvertisedRoomTitle(const FString& AdvertisedTitle)
+{
+	FString Decoded;
+	if (FBase64::Decode(AdvertisedTitle, Decoded))
+	{
+		return Decoded;
+	}
+
+	// 디코드 실패 = Base64가 아님. 구버전 클라이언트가 만든 방이거나
+	// 엔진이 나중에 고쳐져 원문이 그대로 오는 경우 → 있는 그대로 보여준다.
+	return AdvertisedTitle;
+}
 
 #pragma region LOG
 
@@ -168,7 +199,7 @@ void USISessionSubsystem::CreateSessionInternal()
 	SessionSettings.bUseLobbiesIfAvailable = true;
 	
 	// ── 커스텀 데이터 광고: 검색자가 목록에서 볼 정보만. Password는 절대 넣지 않는다 ──
-	SessionSettings.Set(KEY_ROOM_TITLE, PendingParams.RoomTitle,
+	SessionSettings.Set(KEY_ROOM_TITLE, EncodeRoomTitleForAdvertising(PendingParams.RoomTitle),
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 	SessionSettings.Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
@@ -250,7 +281,9 @@ void USISessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 			Info.PingMs = R.PingInMs;
 
 			// 커스텀 데이터 추출 — 호스트가 광고한 값 꺼내기
-			R.Session.SessionSettings.Get(KEY_ROOM_TITLE, Info.RoomTitle);
+			FString AdvertisedTitle;
+			R.Session.SessionSettings.Get(KEY_ROOM_TITLE, AdvertisedTitle);
+			Info.RoomTitle = DecodeAdvertisedRoomTitle(AdvertisedTitle);
 			int32 HasPasswordInt = 0;
 			R.Session.SessionSettings.Get(KEY_HAS_PASSWORD, HasPasswordInt );
 			Info.bHasPassword = (HasPasswordInt  != 0);
@@ -290,7 +323,7 @@ void USISessionSubsystem::UpdateHostSessionParams(const FSICreateSessionParams& 
 		return;
 	}
 
-	CurrentSettings->Set(KEY_ROOM_TITLE, PendingParams.RoomTitle,
+	CurrentSettings->Set(KEY_ROOM_TITLE, EncodeRoomTitleForAdvertising(PendingParams.RoomTitle),
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 	CurrentSettings->Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
@@ -357,8 +390,22 @@ void USISessionSubsystem::JoinSessionByIndex(int32 SearchResultIndex, const FStr
 	PendingJoinPassword = Password;   // private 멤버 FString 하나 추가해서 보관
 	bJoinInProgress = true;           // 이제부터 오는 접속 거절은 "내 것"이다
 
+	FOnlineSessionSearchResult& DesiredSession = SessionSearch->SearchResults[SearchResultIndex];
+
+	// ── 엔진 버그 우회 (UE 5.5 OnlineSubsystemSteam) ──
+	// FOnlineSessionSteam::JoinSession은 맨 앞에서 "검색 결과"의 bUsesPresence와
+	// bUseLobbiesIfAvailable이 다르면 즉시 UnknownError로 실패시킨다.
+	// 그런데 로비 데이터로 실제 전송되는 세션 플래그 비트필드
+	// (GetLobbyKeyValuePairsFromSessionSettings)에는 bUseLobbiesIfAvailable이 빠져 있다.
+	// → 검색으로 복원한 결과는 항상 bUsesPresence=true / bUseLobbiesIfAvailable=false가 되어
+	//   "방은 목록에 보이는데 입장은 100% 실패"한다.
+	// 호스트는 CreateSessionInternal에서 두 값을 같게 만들어 광고하므로,
+	// 복원된 값도 같게 맞춰주면 원래 의도대로 동작한다.
+	DesiredSession.Session.SessionSettings.bUseLobbiesIfAvailable =
+		DesiredSession.Session.SessionSettings.bUsesPresence;
+
 	// PrintNS(FString::Printf(TEXT("Joining session [%d]..."), SearchResultIndex));
-	if (!SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[SearchResultIndex]))
+	if (!SessionInterface->JoinSession(0, NAME_GameSession, DesiredSession))
 	{
 		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
 		// PrintNS(TEXT("JoinSession request REJECTED"), FColor::Red);
@@ -517,6 +564,11 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 		&& ErrorString.Contains(SISessionErrors::WrongPassword))   // 상수 안 쓰면 TEXT("Incorrect password")
 	{
 		Classified = ESIConnectionFailureType::WrongPassword;
+	}
+	else if (FailureType == ENetworkFailure::PendingConnectionFailure
+		&& ErrorString.Contains(SISessionErrors::GameInProgress))
+	{
+		Classified = ESIConnectionFailureType::GameInProgress;
 	}
 	else if (FailureType == ENetworkFailure::ConnectionLost
 		  || FailureType == ENetworkFailure::ConnectionTimeout)
