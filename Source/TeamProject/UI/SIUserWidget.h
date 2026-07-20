@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Enums/SITypes.h"	// FChatMessagePayload
 #include "SIUserWidget.generated.h"
 
 class UEditableText;
@@ -50,4 +51,10 @@ protected:
 	/** GameInstance에 쌓인 기록을 그대로 다시 그린다 (위젯이 새로 만들어질 때 1회).
 		세션이 유지되는 동안 레벨을 오가도 대화가 이어져 보이게 하는 지점. */
 	void RestoreChatHistoryTo(UScrollBox* ScrollBox, TSubclassOf<USIChatLineWidget> LineClass);
+
+public:
+	/** 채팅 한 줄에 표시할 보낸 사람 이름을 정한다.
+		시스템 안내(입장/퇴장)는 빈 문자열 — 받는 쪽 모두가 같은 규칙을 쓰도록 한곳에 둔다.
+		(PlayerState 포인터는 레벨 이동을 넘기면 null이 되므로 받는 즉시 문자열로 박제해야 한다) */
+	static FString ResolveChatSenderName(const FChatMessagePayload& Payload);
 };

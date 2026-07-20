@@ -266,6 +266,12 @@ void ASIGameMode::Logout(AController* Exiting)
 		if (IsValid(ExitingPlayerState))
 		{
 			SIState->Multicast_BroadcastPlayerLeft(ExitingPlayerState);
+
+			// 호스트 이탈은 알리지 않는다 — 리슨 서버라 방이 통째로 사라진다(로비와 같은 규칙).
+			if (Exiting->GetNetConnection() != nullptr)
+			{
+				SIState->AnnouncePlayerLeft(ExitingPlayerState);
+			}
 		}
 
 		SIState->TotalRounds = PlayerOrderList.Num();

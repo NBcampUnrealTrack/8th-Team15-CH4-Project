@@ -78,8 +78,8 @@ void USILobbySettingWidget::FocusChatInput()
 void USILobbySettingWidget::HandleChatMessage(const FChatMessagePayload& Payload)
 {
 	// 저장은 ASIPlayerController가 한다 — 여기서 또 저장하면 같은 줄이 두 번 쌓인다
-	const FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
-	AddChatLineTo(ScrollBox_ChatLog, ChatLineWidgetClass, SenderName, Payload.Message);
+	AddChatLineTo(ScrollBox_ChatLog, ChatLineWidgetClass,
+		ResolveChatSenderName(Payload), Payload.Message);
 }
 
 void USILobbySettingWidget::HandleChatCommitted(const FText& Chat, const ETextCommit::Type CommitMethod)

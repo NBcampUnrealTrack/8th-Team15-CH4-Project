@@ -160,6 +160,13 @@ void ASILobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		if (APlayerState* JoinedPlayerState = IsValid(NewPlayer) ? NewPlayer->PlayerState : nullptr)
 		{
 			SIState->Multicast_BroadcastPlayerJoined(JoinedPlayerState);
+
+			// 호스트는 제외한다 — 방을 만든 사람이 자기 방에 "입장했습니다"는 어색하다.
+			// 리슨 서버의 호스트만 원격 커넥션이 없다(PostLogin 앞쪽의 호스트 판정과 같은 기준).
+			if (NewPlayer->GetNetConnection() != nullptr)
+			{
+				SIState->AnnouncePlayerJoined(JoinedPlayerState);
+			}
 		}
 	}
 }
@@ -173,6 +180,13 @@ void ASILobbyGameMode::Logout(AController* Exiting)
 		if (IsValid(ExitingPlayerState))
 		{
 			SIState->Multicast_BroadcastPlayerLeft(ExitingPlayerState);
+
+			// 호스트 이탈은 알리지 않는다 — 리슨 서버라 방 자체가 사라지므로
+			// 남은 사람은 이 안내 대신 "호스트가 나갔습니다" 팝업을 보고 메인메뉴로 돌아간다.
+			if (Exiting->GetNetConnection() != nullptr)
+			{
+				SIState->AnnouncePlayerLeft(ExitingPlayerState);
+			}
 		}
 	}
 

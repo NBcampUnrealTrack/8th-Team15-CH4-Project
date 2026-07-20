@@ -120,6 +120,16 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_BroadcastChatMessage(const FChatMessagePayload& Payload);
 
+	/** 입장/퇴장 같은 시스템 안내를 채팅창에 흘린다. 서버에서만 호출한다.
+		일반 채팅과 같은 통로를 쓰므로 기록 저장·복원·양쪽 위젯 표시가 그대로 따라온다.
+		두 GameMode(로비/인게임)가 같은 코드를 복사하지 않도록 여기에 둔다. */
+	void BroadcastSystemChat(const FString& Message, APlayerState* AboutPlayer = nullptr);
+
+	/** 입장/퇴장 안내. 문구가 로비와 인게임에서 갈리지 않도록 여기에 모아둔다.
+		"누구를 제외할지"(호스트 등)는 부르는 GameMode가 판단한다. */
+	void AnnouncePlayerJoined(APlayerState* Player);
+	void AnnouncePlayerLeft(APlayerState* Player);
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnPlayerJoinedSignature OnPlayerJoined;
 

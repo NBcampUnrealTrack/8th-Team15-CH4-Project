@@ -64,6 +64,12 @@ struct TEAMPROJECT_API FChatMessagePayload
 	// 메시지 본문
 	UPROPERTY(BlueprintReadOnly, Category = "Chat")
 	FString Message;
+
+	/** 입장/퇴장 안내처럼 사람이 친 게 아닌 메시지.
+		true면 보낸 사람 이름 없이 본문만 표시한다("왕건 : 왕건님이 입장했습니다"를 피하려고).
+		Sender는 안내의 대상이 누구인지 알아야 할 때를 위해 채워둘 수 있다. */
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	bool bIsSystemMessage = false;
 };
 
 USTRUCT(BlueprintType)

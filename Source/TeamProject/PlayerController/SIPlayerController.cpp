@@ -252,7 +252,8 @@ void ASIPlayerController::HandleChatMessageForHistory(const FChatMessagePayload&
 {
 	// Sender는 APlayerState* 라 레벨 이동을 넘기면 전부 null이 된다.
 	// 받는 즉시 이름을 문자열로 박제해야 travel 후에도 "???"가 되지 않는다.
-	const FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
+	// (시스템 안내는 빈 이름으로 저장되어 복원 시에도 본문만 그려진다)
+	const FString SenderName = USIUserWidget::ResolveChatSenderName(Payload);
 
 	if (USIGameInstance* GI = GetGameInstance<USIGameInstance>())
 	{

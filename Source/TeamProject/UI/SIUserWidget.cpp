@@ -6,7 +6,19 @@
 #include "Components/EditableText.h"
 #include "Components/ScrollBox.h"
 #include "GameInstance/SIGameInstance.h"
+#include "GameFramework/PlayerState.h"
 #include "UI/SIChatLineWidget.h"
+
+FString USIUserWidget::ResolveChatSenderName(const FChatMessagePayload& Payload)
+{
+	// 시스템 안내는 이름을 붙이지 않는다 ("왕건 : 왕건님이 입장했습니다"가 되지 않도록)
+	if (Payload.bIsSystemMessage)
+	{
+		return FString();
+	}
+
+	return IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
+}
 
 void USIUserWidget::AddChatLineTo(UScrollBox* ScrollBox, TSubclassOf<USIChatLineWidget> LineClass,
 	const FString& SenderName, const FString& Message)

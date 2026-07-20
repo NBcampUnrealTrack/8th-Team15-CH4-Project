@@ -1,6 +1,7 @@
 
 #include "SIGameState.h"
 #include "GameInstance/SIGameInstance.h"
+#include "GameFramework/PlayerState.h"	// AnnouncePlayerJoined/Left에서 GetPlayerName() 사용
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
@@ -136,6 +137,44 @@ void ASIGameState::Multicast_ShowLoadingScreen_Implementation()
 void ASIGameState::Multicast_BroadcastChatMessage_Implementation(const FChatMessagePayload& Payload)
 {
 	OnChatMessage.Broadcast(Payload);
+}
+
+void ASIGameState::BroadcastSystemChat(const FString& Message, APlayerState* AboutPlayer)
+{
+	if (!HasAuthority() || Message.IsEmpty())
+	{
+		return;
+	}
+
+	FChatMessagePayload Payload;
+	Payload.Sender = AboutPlayer;
+	Payload.Message = Message;
+	Payload.bIsSystemMessage = true;
+
+	Multicast_BroadcastChatMessage(Payload);
+}
+
+void ASIGameState::AnnouncePlayerJoined(APlayerState* Player)
+{
+	if (!IsValid(Player) || Player->GetPlayerName().IsEmpty())
+	{
+		return;
+	}
+
+	BroadcastSystemChat(
+		FString::Printf(TEXT("%s님이 입장했습니다"), *Player->GetPlayerName()), Player);
+}
+
+void ASIGameState::AnnouncePlayerLeft(APlayerState* Player)
+{
+	if (!IsValid(Player) || Player->GetPlayerName().IsEmpty())
+	{
+		return;
+	}
+
+	// Logout 도중이라 Player가 곧 파괴된다. 이름은 지금 문자열로 떠서 넘긴다.
+	BroadcastSystemChat(
+		FString::Printf(TEXT("%s님이 나갔습니다"), *Player->GetPlayerName()), nullptr);
 }
 
 void ASIGameState::Multicast_BroadcastPlayerJoined_Implementation(APlayerState* JoinedPlayer)
