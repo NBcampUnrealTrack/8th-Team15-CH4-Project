@@ -27,7 +27,11 @@
 #include "Net/UnrealNetwork.h"
 #include "UI/SIDrawingToolWidget.h"
 #include "UI/SIUserWidget.h"
+#include "UI/SINameplateWidget.h"
 #include "Component/SIUIManagerComponent.h"
+#include "Components/WidgetComponent.h"
+#include "GameFramework/PlayerState.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -71,6 +75,25 @@ ASICharacter::ASICharacter()
 	ArmOnlyComp->SetupAttachment(CameraComp);
 	ArmOnlyComp->SetOnlyOwnerSee(true);
 	ArmOnlyComp->bCastDynamicShadow = false;
+
+	// 머리 위 닉네임
+	NameplateComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("Nameplate"));
+	NameplateComp->SetupAttachment(GetCapsuleComponent());
+	// 캡슐 절반 높이 위 = 대략 머리 위
+	NameplateComp->SetRelativeLocation(FVector(0.0f, 0.0f, 100.0f));
+	// ★ Screen 공간을 쓰면 안 된다.
+	//   UWidgetComponent::GetOwnerPlayer()는 소유 폰의 컨트롤러에서 LocalPlayer를 찾는데,
+	//   원격 플레이어의 폰은 서버에서 그 값이 null이라 화면에 아예 추가되지 않는다
+	//   (UpdateWidgetOnScreen의 TargetPlayer 검사). 결과적으로 호스트에게만 남의 이름표가 안 보인다.
+	//   World 공간은 실제 3D 프리미티브라 모두에게 그려진다. 대신 매 틱 카메라를 향하게 돌려줘야 한다.
+	NameplateComp->SetWidgetSpace(EWidgetSpace::World);
+	NameplateComp->SetDrawSize(FVector2D(320.0f, 64.0f));
+	// World 공간에서 DrawSize는 언리얼 단위(1픽셀 = 1cm)로 해석된다. 그대로면 3m짜리 간판이 되므로 축소한다.
+	NameplateComp->SetRelativeScale3D(FVector(0.25f));
+	// 1인칭이라 본인 화면에서는 자기 이름표가 눈앞을 가린다. 몸 메시와 같은 규칙으로 숨긴다.
+	NameplateComp->SetOwnerNoSee(true);
+	// 이름표가 조준/배치 트레이스에 걸리면 안 된다
+	NameplateComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	// 오브젝트 프리뷰 기즈모는 Character가 연결만 담당한다.
 	PreviewTransformGizmoComponent = CreateDefaultSubobject<USIPreviewTransformGizmoComponent>(TEXT("PreviewTransformGizmoComponent"));
@@ -141,14 +164,106 @@ void ASICharacter::BeginPlay()
 	{
 		PreviewTransformGizmoComponent->OnTransformChanged.AddUObject(this, &ASICharacter::HandlePreviewGizmoTransformChanged);
 	}
+
+	// OnRep_PlayerState가 BeginPlay보다 먼저 올 수도 있어 여기서도 한 번 시도한다(멱등).
+	RefreshNameplate();
 }
 
 void ASICharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
-	
+
 	// 초기 가시성 설정
 	UpdateMeshVisibility();
+
+	// 서버 경로 — 이 시점에 PlayerState가 붙는다
+	RefreshNameplate();
+}
+
+void ASICharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	// 클라이언트 경로 — PlayerState 포인터가 도착한 시점.
+	// 다만 이름 문자열은 PlayerState와 별개로 복제되어 아직 비어 있을 수 있다.
+	RefreshNameplate();
+}
+
+void ASICharacter::UpdateNameplateFacing()
+{
+	if (!IsValid(NameplateComp) || !NameplateComp->IsVisible())
+	{
+		return;
+	}
+
+	// 이름표는 "보는 사람" 기준으로 돌아야 하므로 이 클라이언트의 카메라를 본다.
+	// 서버에서 남의 폰을 돌려봐야 의미가 없고(각자 화면에서 각자 돌린다),
+	// 이 함수는 화면 표시용이라 복제도 필요 없다.
+	const UWorld* World = GetWorld();
+	const APlayerController* LocalPC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!IsValid(LocalPC) || !IsValid(LocalPC->PlayerCameraManager))
+	{
+		return;
+	}
+
+	// 위젯 평면은 YZ이고 법선(TangentZ)이 +X다
+	// (WidgetComponent.cpp의 Plane 정점 구성에서 AddVertex(..., FVector3f(1,0,0), ...)).
+	// World 공간 위젯은 단면이라 +X가 카메라를 향하지 않으면 컬링되어 아예 안 보인다.
+	// → 위젯에서 카메라로 향하는 방향을 그대로 회전으로 준다.
+	// Pitch/Roll은 버려서 위아래로 볼 때도 글자가 눕지 않게 한다.
+	const FVector CameraLocation = LocalPC->PlayerCameraManager->GetCameraLocation();
+	const FVector ToCamera = CameraLocation - NameplateComp->GetComponentLocation();
+
+	FRotator FacingRotation = ToCamera.Rotation();
+	FacingRotation.Pitch = 0.0f;
+	FacingRotation.Roll = 0.0f;
+	NameplateComp->SetWorldRotation(FacingRotation);
+}
+
+void ASICharacter::RefreshNameplate()
+{
+	if (!IsValid(NameplateComp))
+	{
+		return;
+	}
+
+	// 위젯 클래스가 비어 있으면 아무리 기다려도 위젯이 안 생긴다 — 재시도하지 않고 한 번만 알린다.
+	if (!NameplateComp->GetWidgetClass())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Character] 이름표 위젯 클래스가 비어 있습니다. "
+				"BP_PlayerCharacter의 Nameplate 컴포넌트에 WBP_Nameplate를 지정하세요."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+
+	const APlayerState* PS = GetPlayerState();
+	const FString PlayerName = IsValid(PS) ? PS->GetPlayerName() : FString();
+
+	// 위젯 클래스는 BP_PlayerCharacter의 Nameplate 컴포넌트에서 지정한다.
+	USINameplateWidget* NameplateWidget = Cast<USINameplateWidget>(NameplateComp->GetUserWidgetObject());
+
+	// 두 가지가 각각 늦게 준비된다:
+	//   - 이름 문자열: PlayerState 포인터와 별개로 복제되어 나중에 도착할 수 있다
+	//   - 위젯 인스턴스: WidgetComponent가 InitWidget 시점에 만든다
+	// 둘 중 하나라도 안 됐는데 그냥 빠져나가면 빈 이름표가 영영 남으므로 재시도한다.
+	if (PlayerName.IsEmpty() || !IsValid(NameplateWidget))
+	{
+		if (World)
+		{
+			World->GetTimerManager().SetTimer(
+				NameplateRetryTimer, this, &ASICharacter::RefreshNameplate, 0.1f, false);
+		}
+		return;
+	}
+
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(NameplateRetryTimer);
+	}
+
+	NameplateWidget->SetPlayerName(PlayerName);
 }
 
 void ASICharacter::PostNetInit()
@@ -163,6 +278,9 @@ void ASICharacter::PostNetInit()
 void ASICharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// 아래 조기 반환보다 앞에 둔다 — 제작 단계가 아닐 때도 이름표는 카메라를 따라와야 한다.
+	UpdateNameplateFacing();
 
 	if (!IsShapeEditingAllowed())
 	{

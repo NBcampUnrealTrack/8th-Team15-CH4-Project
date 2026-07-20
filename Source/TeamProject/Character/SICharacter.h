@@ -15,6 +15,7 @@ class UInputMappingContext;
 class USIIPlayerCharacternputConfig;
 class UStaticMeshComponent;
 class UCameraComponent;
+class UWidgetComponent;
 
 struct FInputActionValue;
 enum class ESIGamePhase : uint8;
@@ -64,7 +65,32 @@ protected:
 	// 1인칭 카메라 전용 팔(손)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "CharacterComponent")
 	TObjectPtr<UStaticMeshComponent> ArmOnlyComp;
-	
+
+	// 머리 위 닉네임. 1인칭이라 본인에게는 보이지 않게 한다(SetOwnerNoSee).
+	// 표시할 위젯 클래스는 BP_PlayerCharacter의 이 컴포넌트 디테일에서 지정한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "CharacterComponent")
+	TObjectPtr<UWidgetComponent> NameplateComp;
+
+#pragma endregion
+
+#pragma region Nameplate
+
+protected:
+	/** 닉네임 표시를 현재 PlayerState 기준으로 갱신한다.
+		이름은 PlayerState와 별개로 복제되어 늦게 도착할 수 있으므로,
+		비어 있으면 짧은 간격으로 재시도한다(이 코드베이스의 0.1초 재시도 패턴). */
+	void RefreshNameplate();
+
+	/** 이름표를 보는 사람의 카메라 쪽으로 돌린다(빌보딩).
+		World 공간 위젯은 스스로 카메라를 향하지 않으므로 매 틱 직접 돌려줘야 한다. */
+	void UpdateNameplateFacing();
+
+	/** 클라이언트에서 PlayerState 포인터가 도착하는 시점 */
+	virtual void OnRep_PlayerState() override;
+
+private:
+	FTimerHandle NameplateRetryTimer;
+
 #pragma endregion
 	
 #pragma region Input
