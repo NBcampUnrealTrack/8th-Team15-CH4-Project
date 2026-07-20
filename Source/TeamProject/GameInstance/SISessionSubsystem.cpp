@@ -4,6 +4,7 @@
 #include "SISessionSubsystem.h"
 
 #include "OnlineSessionSettings.h"
+#include "OnlineSubsystemNames.h"	// NULL_SUBSYSTEM
 #include "OnlineSubsystemUtils.h"
 #include "Online/OnlineSessionNames.h"
 
@@ -106,6 +107,22 @@ bool USISessionSubsystem::EnsureSessionInterface()
 	return false;
 }
 
+bool USISessionSubsystem::IsLanOnlySubsystem() const
+{
+	const IOnlineSubsystem* Subsystem = Online::GetSubsystem(GetWorld());
+	if (!Subsystem)
+	{
+		// 서브시스템조차 못 잡은 상황. LAN으로 취급하는 게 안전하다
+		// (Steam 로비를 못 여는 것보다, 최소한 같은 망에서라도 붙는 편이 낫다)
+		return true;
+	}
+
+	// Null 외의 구현체(Steam 등)는 전부 "인터넷 너머로 광고 가능"으로 본다.
+	// 이름을 STEAM으로 화이트리스트하지 않고 NULL만 블랙리스트하는 이유:
+	// 나중에 EOS 등으로 갈아타도 이 함수를 고칠 일이 없다.
+	return Subsystem->GetSubsystemName() == NULL_SUBSYSTEM;
+}
+
 #pragma endregion
 
 #pragma region Create Session
@@ -139,11 +156,16 @@ void USISessionSubsystem::CreateSessionInternal()
 {
 	// Session Settings
 	FOnlineSessionSettings SessionSettings;
-	SessionSettings.bIsLANMatch = true;   // Null = LAN. Steam 전환 시 서브시스템 이름 검사로 분기
+	SessionSettings.bIsLANMatch = IsLanOnlySubsystem();   // Null = LAN 브로드캐스트 / Steam = 로비 서버
 	SessionSettings.NumPublicConnections = PendingParams.MaxPlayers;
 	SessionSettings.bShouldAdvertise = true;	// 모든 방은 목록에 노출된다. 입장 제한은 비밀번호로만 건다
-	SessionSettings.bUsesPresence = true;	// Null에선 무의미하지만 마이그레이션 대비
 	SessionSettings.bAllowJoinInProgress = true;
+
+	// Steam 구현체는 이 둘을 "같은 의미"로 보고, 값이 어긋나면 경고를 뱉으며 동작이 갈린다.
+	// (OnlineSessionInterfaceSteam.cpp: "treated as equal and have to match")
+	// 켜져 있어야 전용 서버 없이 스팀 로비로 방이 열린다 — 우리 리슨 서버 구조의 전제.
+	SessionSettings.bUsesPresence = true;
+	SessionSettings.bUseLobbiesIfAvailable = true;
 	
 	// ── 커스텀 데이터 광고: 검색자가 목록에서 볼 정보만. Password는 절대 넣지 않는다 ──
 	SessionSettings.Set(KEY_ROOM_TITLE, PendingParams.RoomTitle,
@@ -190,8 +212,11 @@ void USISessionSubsystem::FindSessions(int32 MaxSearchResults)
 	}
 
 	SessionSearch = MakeShareable(new FOnlineSessionSearch());
-	SessionSearch->bIsLanQuery = true;
+	SessionSearch->bIsLanQuery = IsLanOnlySubsystem();   // 광고 방식과 반드시 짝이 맞아야 한다
 	SessionSearch->MaxSearchResults = MaxSearchResults;
+	// Steam은 이 플래그를 보고 서버 브라우저가 아닌 "로비 검색" 경로를 탄다.
+	// (OnlineSessionInterfaceSteam.cpp의 SEARCH_PRESENCE/SEARCH_LOBBIES 분기 → FindLobbies)
+	// Null에선 무시되므로 그대로 둬도 무해하다.
 	SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
 
 	FindSessionsCompleteDelegateHandle =

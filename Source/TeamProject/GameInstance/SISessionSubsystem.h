@@ -192,6 +192,15 @@ protected:
 		이 시점의 World는 확정된 상태라 소유 GameInstance 비교를 신뢰할 수 있다. */
 	void HandlePostLoadMap(UWorld* LoadedWorld);
 	
+public:
+	/** 현재 붙어 있는 온라인 서브시스템이 LAN 전용(Null)인가.
+		Null이면 방 광고/검색이 UDP 브로드캐스트라 같은 공유기 안에서만 보이고,
+		Steam이면 밸브 로비 서버를 거치므로 인터넷 너머까지 보인다.
+		CreateSession/FindSessions가 이 값으로 bIsLANMatch·bIsLanQuery를 정한다.
+		→ ini의 DefaultPlatformService만 바꿔도 코드 수정 없이 전환된다. */
+	UFUNCTION(BlueprintPure, Category = "SI|Session")
+	bool IsLanOnlySubsystem() const;
+
 private:
 	/** 세션 인터페이스 지연 획득 (Initialize 시점엔 World가 아직 없을 수 있음) */
 	bool EnsureSessionInterface();

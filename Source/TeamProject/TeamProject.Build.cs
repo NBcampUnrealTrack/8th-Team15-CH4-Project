@@ -19,8 +19,10 @@ public class TeamProject : ModuleRules
 			"OnlineSubsystem", "OnlineSubsystemUtils",
         });
 		
-		// Null Subsystem Module
+		// Online Subsystem 구현체 — 어느 쪽을 쓸지는 DefaultEngine.ini의 DefaultPlatformService가 정한다.
+		// 둘 다 실어두는 이유: Steam이 없는 환경(스팀 미실행/미설치)에서 엔진이 Null로 폴백할 수 있어야 함.
 		DynamicallyLoadedModuleNames.Add("OnlineSubsystemNull");
+		DynamicallyLoadedModuleNames.Add("OnlineSubsystemSteam");
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
             "InteractiveToolsFramework"

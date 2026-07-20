@@ -21,6 +21,13 @@
 			"TargetAllowList": [
 				"Editor"
 			]
+		},
+		{
+			"Name": "OnlineSubsystemSteam",
+			"Enabled": true,
+			"PlatformAllowList": [
+				"Win64"
+			]
 		}
 	]
 }
