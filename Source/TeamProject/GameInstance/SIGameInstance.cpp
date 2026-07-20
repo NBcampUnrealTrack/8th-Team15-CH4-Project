@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"	// SealMatchRoster에서 GetUniqueId() 사용
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "UObject/UObjectGlobals.h"
@@ -249,6 +250,55 @@ void USIGameInstance::ConsumePendingMatch()
 {
 	bPendingMatchStart = false;
 	ExpectedPlayerCount = 0;
+}
+
+void USIGameInstance::SealMatchRoster(const TArray<APlayerState*>& Players)
+{
+	MatchRosterIds.Empty();
+
+	for (const APlayerState* Player : Players)
+	{
+		if (!IsValid(Player))
+		{
+			continue;
+		}
+
+		const FUniqueNetIdRepl& PlayerId = Player->GetUniqueId();
+		if (PlayerId.IsValid())
+		{
+			MatchRosterIds.Add(PlayerId.ToString());
+		}
+	}
+
+	bMatchRosterSealed = true;
+
+	UE_LOG(LogTemp, Log, TEXT("[GameInstance] 매치 명단 봉인: %d명 (이후 접속은 중도 참여로 거절)"),
+		MatchRosterIds.Num());
+}
+
+void USIGameInstance::ClearMatchRoster()
+{
+	MatchRosterIds.Empty();
+	bMatchRosterSealed = false;
+}
+
+bool USIGameInstance::IsInMatchRoster(const FUniqueNetIdRepl& PlayerId) const
+{
+	return PlayerId.IsValid() && MatchRosterIds.Contains(PlayerId.ToString());
+}
+
+void USIGameInstance::ConsumeMatchRosterEntry(const FUniqueNetIdRepl& PlayerId)
+{
+	if (!bMatchRosterSealed || !PlayerId.IsValid())
+	{
+		return;
+	}
+
+	if (MatchRosterIds.Remove(PlayerId.ToString()) > 0)
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("[GameInstance] 매치 입장권 사용 — 남은 인원: %d"),
+			MatchRosterIds.Num());
+	}
 }
 
 void USIGameInstance::AddChatLog(const FString& SenderName, const FString& Message)

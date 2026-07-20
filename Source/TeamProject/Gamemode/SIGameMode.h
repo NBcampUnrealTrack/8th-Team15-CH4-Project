@@ -32,6 +32,14 @@ public:
 	ASIGameMode();
 
 	virtual void BeginPlay() override;
+
+	/** 이미 시작된 매치로의 중도 참여를 거절한다.
+		단, 논심리스 ServerTravel은 로비에서 함께 넘어온 기존 플레이어도 PreLogin을 다시 태우므로
+		"게임 중이면 무조건 거절"로 짜면 전원이 튕겨나간다.
+		→ 로비 출발 시 봉인해둔 참가자 명단(USIGameInstance)에 있는지로 구분한다. */
+	virtual void PreLogin(const FString& Options, const FString& Address,
+		const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
+
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 

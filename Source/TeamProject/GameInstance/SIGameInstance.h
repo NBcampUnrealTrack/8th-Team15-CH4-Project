@@ -46,6 +46,21 @@ public:
 	bool IsPendingMatchReady(int32 ConnectedPlayerCount) const;
 	void ConsumePendingMatch();
 
+	// ── 중도 참여 차단용 참가자 명단 (서버 전용, travel 생존) ──
+	// 논심리스 ServerTravel은 "이동해 온 기존 플레이어"도 PreLogin을 다시 태운다.
+	// 그래서 인게임 GameMode에서 "게임 중이면 거절"을 그냥 걸면 전원이 튕겨나간다.
+	// → 로비에서 출발할 때 명단을 봉인해두고, 그 안에 있으면 통과 / 없으면 난입으로 보고 거절한다.
+	void SealMatchRoster(const TArray<APlayerState*>& Players);
+	void ClearMatchRoster();
+	bool IsMatchRosterSealed() const { return bMatchRosterSealed; }
+	bool IsInMatchRoster(const FUniqueNetIdRepl& PlayerId) const;
+
+	// 명단은 1회용 입장권이다. 실제로 입장을 마치면 소모시킨다.
+	// 이유: 워크스페이스 배정(SpawnPlayersToIndividualWorkspaces)은 매치 시작 시 1회뿐이라,
+	// 게임 도중 튕겨서 재접속한 사람은 배정받을 자리가 없어 폰 없이 카메라만 남는다.
+	// 명단에 남겨두면 "통과는 되는데 게임은 못 하는" 상태가 되므로, 들어온 즉시 표를 회수한다.
+	void ConsumeMatchRosterEntry(const FUniqueNetIdRepl& PlayerId);
+
 	void AddChatLog(const FString& SenderName, const FString& Message);
 	const TArray<FChatLogEntry>& GetChatHistory() const { return ChatHistory; }
 	void ClearChatHistory();
@@ -99,6 +114,13 @@ private:
 private:
 	UPROPERTY()
 	bool bPendingMatchStart = false;
+
+	// 봉인 여부를 별도 플래그로 두는 이유: 명단이 비어 있는 것과
+	// "아직 봉인한 적 없음(=로비 상태)"은 의미가 다르다.
+	bool bMatchRosterSealed = false;
+
+	// FUniqueNetIdRepl 대신 문자열로 보관 — 로그로 눈으로 확인하기 쉽고 해싱 걱정이 없다.
+	TSet<FString> MatchRosterIds;
 	
 	UPROPERTY()
 	int32 ExpectedPlayerCount = 0;

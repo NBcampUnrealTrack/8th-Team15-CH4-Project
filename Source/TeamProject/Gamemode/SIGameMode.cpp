@@ -131,6 +131,38 @@ void ASIGameMode::BeginPlay()
 	}
 }
 
+void ASIGameMode::PreLogin(const FString& Options, const FString& Address,
+	const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+
+	// Super가 이미 거절 사유를 채웠으면 그대로 존중
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+
+	const USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>();
+
+	// 판단 근거가 없으면 통과시킨다 (SILobbyGameMode::PreLogin과 같은 "개발 편의" 방침).
+	// 명단이 봉인되지 않았다 = 로비를 거치지 않고 이 맵이 직접 열렸다(에디터 단독 실행 등).
+	if (!IsValid(SIInstance) || !SIInstance->IsMatchRosterSealed())
+	{
+		return;
+	}
+
+	// 로비에서 함께 출발한 인원 — travel로 재접속하는 정상 경로
+	if (SIInstance->IsInMatchRoster(UniqueId))
+	{
+		return;
+	}
+
+	ErrorMessage = SISessionErrors::GameInProgress;
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[GameMode] PreLogin 거절: 이미 시작된 매치에 중도 참여 시도 (%s)"), *Address);
+}
+
 void ASIGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
@@ -145,6 +177,14 @@ void ASIGameMode::PostLogin(APlayerController* NewPlayer)
 	if (ASIPlayerState* PlayerState = NewPlayer->GetPlayerState<ASIPlayerState>())
 	{
 		PlayerState->bIsHost = PlayerOrderList.Num() == 1;
+
+		// 입장이 확정됐으니 이 사람 몫의 입장권을 회수한다.
+		// 이후 같은 사람이 다시 접속을 시도하면(게임 중 튕김 등) 명단에 없어 거절된다 —
+		// 워크스페이스 배정이 끝난 뒤라 들여봐야 폰 없이 카메라만 남기 때문.
+		if (USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>())
+		{
+			SIInstance->ConsumeMatchRosterEntry(PlayerState->GetUniqueId());
+		}
 
 		if (ASIGameState* SIState = GetGameState<ASIGameState>())
 		{

@@ -98,6 +98,13 @@ void ASILobbyGameMode::BeginPlay()
 
 	SIState->SetGamePhase(ESIGamePhase::LobbyPhase);
 
+	// 로비에 있다 = 매치가 진행 중이 아니다. 봉인해둔 참가자 명단을 풀어 다시 입장을 받는다.
+	// 첫 입장이든 게임을 마치고 돌아온 것이든 동일하게 동작한다(멱등).
+	if (USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>())
+	{
+		SIInstance->ClearMatchRoster();
+	}
+
 	// 호스트 GameInstance가 보관 중인 방 설정을 GameState로 옮겨 클라이언트 UI까지 도달시킵니다.
 	if (const UGameInstance* GameInstanceRef = GetGameInstance())
 	{
@@ -238,6 +245,10 @@ void ASILobbyGameMode::RequestStartGame(ASIPlayerState* RequestingPlayerState)
 
 	bTravelRequested = true;
 	SIInstance->PreparePendingMatch(SIState->PlayerArray.Num());
+
+	// 지금 로비에 있는 인원만 이번 매치의 참가자다. 이 명단이 인게임 PreLogin의 통과 기준이 된다.
+	// (여기서 봉인해야 travel 도중/이후에 들어오려는 접속을 걸러낼 수 있다)
+	SIInstance->SealMatchRoster(SIState->PlayerArray);
 	SIState->Mulitcast_GameStartSound();
 
 	// 버튼을 누르는 즉시 로딩 화면으로 덮는다.

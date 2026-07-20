@@ -143,6 +143,9 @@ FText ASITitlePlayerController::MakeFailureMessage(const ESIConnectionFailureTyp
 	case ESIConnectionFailureType::ConnectionLost:
 		return FText::FromString(TEXT("호스트가 방을 나갔거나 연결이 끊어졌습니다."));
 
+	case ESIConnectionFailureType::GameInProgress:
+		return FText::FromString(TEXT("이미 게임이 시작된 방입니다. 다른 방을 이용해주세요."));
+
 	default:
 		return FText::FromString(TEXT("방에 접속하지 못했습니다."));
 	}

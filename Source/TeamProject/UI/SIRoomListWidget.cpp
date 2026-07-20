@@ -308,7 +308,16 @@ void USIRoomListWidget::HandleRoomSelected(const int32 SearchResultIndex)
 		EditableText_JoinPassword->SetText(FText::GetEmpty());
 	}
 
-	SetStatusText(FText::GetEmpty());
+	// 입장 버튼이 왜 꺼져 있는지 알려준다 (이유 없이 안 눌리면 고장으로 보인다)
+	const USIRoomEntryWidget* JustSelected = FindSelectedEntry();
+	if (JustSelected && JustSelected->GetSessionInfo().bIsInProgress)
+	{
+		SetStatusText(FText::FromString(TEXT("이미 게임이 시작된 방입니다")));
+	}
+	else
+	{
+		SetStatusText(FText::GetEmpty());
+	}
 	UpdateJoinControls();
 }
 
@@ -334,9 +343,15 @@ void USIRoomListWidget::UpdateJoinControls()
 {
 	const USIRoomEntryWidget* SelectedEntry = FindSelectedEntry();
 
+	// 이미 시작된 방은 서버가 PreLogin에서 거절하므로 여기서 미리 막는다.
+	// (서버까지 갔다가 튕겨 메인메뉴로 돌아오는 왕복을 아낀다)
+	const bool bSelectedRoomInProgress =
+		SelectedEntry != nullptr && SelectedEntry->GetSessionInfo().bIsInProgress;
+
 	if (Button_Join)
 	{
-		Button_Join->SetIsEnabled(SelectedEntry != nullptr && !bRequestInProgress);
+		Button_Join->SetIsEnabled(
+			SelectedEntry != nullptr && !bRequestInProgress && !bSelectedRoomInProgress);
 	}
 
 	if (Button_Refresh)
