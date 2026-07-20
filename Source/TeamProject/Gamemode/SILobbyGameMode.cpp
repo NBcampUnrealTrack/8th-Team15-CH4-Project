@@ -192,7 +192,10 @@ void ASILobbyGameMode::Logout(AController* Exiting)
 			const ASIPlayerState* ExitingSIState = Cast<ASIPlayerState>(ExitingPlayerState);
 			const bool bExitingPlayerIsHost = IsValid(ExitingSIState) && ExitingSIState->bIsHost;
 
-			if (!bExitingPlayerIsHost)
+			// 게임 시작 트래블은 "퇴장"이 아니다.
+			// 논심리스 ServerTravel은 전원의 PlayerController를 파괴하므로 참가자 수만큼 Logout이
+			// 몰려온다. 걸러내지 않으면 인게임에 도착하자마자 "OO님이 나갔습니다"가 줄줄이 뜬다.
+			if (!bExitingPlayerIsHost && !bTravelRequested)
 			{
 				SIState->AnnouncePlayerLeft(ExitingPlayerState);
 			}

@@ -134,7 +134,11 @@ private:
 	FTimerHandle ResultLoadingScreenTimerHandle;
 
 	int32 CurrentWorkspaceIndex = -1;
-	
+
+	// 로비 복귀 트래블이 시작됐는지. 트래블로 인한 Logout을 진짜 퇴장과 구분하는 데 쓴다
+	// (ASILobbyGameMode의 같은 이름 플래그와 같은 역할).
+	bool bTravelRequested = false;
+
 	void ApplyHostMatchSettings();
 	int32 GetCreatorScoreForCorrectAnswer(int32 KeywordLevel, bool bIsFirstCorrect) const;
 

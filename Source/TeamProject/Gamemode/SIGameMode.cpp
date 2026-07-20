@@ -271,8 +271,10 @@ void ASIGameMode::Logout(AController* Exiting)
 			// GetNetConnection()이 아니라 bIsHost로 판단하는 이유는 SILobbyGameMode::Logout 주석 참고
 			// (Logout 시점엔 참가자도 커넥션이 이미 null이라 전원이 호스트로 오인된다).
 			// 아래의 새 호스트 승계보다 먼저 읽어야 나가는 본인의 값을 본다.
+			// 로비 복귀 트래블로 인한 Logout도 퇴장이 아니므로 안내하지 않는다
+			// (ASILobbyGameMode::Logout의 게임 시작 트래블 처리와 같은 이유).
 			const ASIPlayerState* ExitingSIState = Cast<ASIPlayerState>(ExitingPlayerState);
-			if (!IsValid(ExitingSIState) || !ExitingSIState->bIsHost)
+			if ((!IsValid(ExitingSIState) || !ExitingSIState->bIsHost) && !bTravelRequested)
 			{
 				SIState->AnnouncePlayerLeft(ExitingPlayerState);
 			}
@@ -832,6 +834,9 @@ void ASIGameMode::ReturnToLobby()
 {
 	GetWorldTimerManager().ClearTimer(ReturnToLobbyTimerHandle);
 	GetWorldTimerManager().ClearTimer(ResultLoadingScreenTimerHandle);
+
+	// 이 뒤로 쏟아지는 Logout은 트래블 때문이지 퇴장이 아니다 (Logout의 안내 억제용).
+	bTravelRequested = true;
 
 	ProcessServerTravel(
 		TEXT("/Game/Shape_It/Level/Test_Lobby?listen?game=/Script/TeamProject.SILobbyGameMode"));
