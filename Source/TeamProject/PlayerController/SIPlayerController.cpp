@@ -10,6 +10,7 @@
 #include "UI/SILobbySettingWidget.h"
 #include "UI/SIHUDWidget.h"
 #include "UI/SIParticipantsListWidget.h"
+#include "UI/SIControlGuideWidget.h"
 #include "UI/SIScoreBoardWidget.h"
 
 #include "EnhancedInputComponent.h"
@@ -244,6 +245,12 @@ void ASIPlayerController::SetupInputComponent()
 	// (채팅창이 포커스된 동안엔 Enter를 Slate(EditableText)가 먹으므로 여기로 안 옴)
 	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ASIPlayerController::FocusChat);
 
+	// 조작 가이드: F1을 누르고 있는 동안만 표시.
+	// Tab(참가자 목록)처럼 IA 애셋을 두지 않고 Enter와 같이 키를 직접 잡는다 —
+	// 홀드 표시에 필요한 건 눌림/뗌 두 시점뿐이라 애셋을 추가할 이유가 없다.
+	InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ASIPlayerController::OpenControlGuideWidget);
+	InputComponent->BindKey(EKeys::F1, IE_Released, this, &ASIPlayerController::CloseControlGuideWidget);
+
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 
 	if (!EnhancedInputComponent)
@@ -320,6 +327,45 @@ void ASIPlayerController::CloseParticipantsListWidget()
 	}
 }
 
+void ASIPlayerController::OpenControlGuideWidget()
+{
+	// 제작/정답 단계에서만 — 로비나 결과 화면엔 안내할 조작이 없다
+	if (CurrentPhase != ESIGamePhase::BuildPhase && CurrentPhase != ESIGamePhase::GuessPhase)
+	{
+		return;
+	}
+
+	// 키 반복 입력으로 Pressed가 연달아 들어와도 위젯이 겹쳐 쌓이지 않게 막는다
+	if (IsValid(ControlGuideWidget) || !ControlGuideWidgetClass)
+	{
+		return;
+	}
+
+	ControlGuideWidget = CreateWidget<USIControlGuideWidget>(this, ControlGuideWidgetClass);
+	if (!IsValid(ControlGuideWidget))
+	{
+		return;
+	}
+
+	// HUD/드로잉툴(기본 0) 위에 얹는다. 단계가 바뀌며 HUD가 새로 생성돼도 가려지지 않도록
+	// 명시적인 ZOrder를 준다. 로딩 화면(1000)보다는 아래.
+	constexpr int32 ControlGuideZOrder = 100;
+	ControlGuideWidget->AddToViewport(ControlGuideZOrder);
+}
+
+void ASIPlayerController::CloseControlGuideWidget()
+{
+	// 여는 쪽과 달리 페이즈를 따지지 않는다.
+	// 누른 채로 단계가 넘어가면 조건이 어긋나 영영 안 닫히기 때문이다.
+	if (!IsValid(ControlGuideWidget))
+	{
+		return;
+	}
+
+	ControlGuideWidget->RemoveFromParent();
+	ControlGuideWidget = nullptr;
+}
+
 void ASIPlayerController::CloseAllPhaseWidgets()
 {
 	if (LobbySettingWidget)
@@ -351,11 +397,19 @@ void ASIPlayerController::CloseAllPhaseWidgets()
 void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
-	
+
 	//사운드 파라미터 업데이트 함수
 	UpdateBGMParameters(NewPhase);
-	
+
 	CloseAllPhaseWidgets();
+
+	// F1을 누른 채로 단계가 넘어갈 수 있다. 제작↔정답 사이 이동이면 그대로 두고,
+	// 가이드가 없는 단계로 갔다면 뗄 때까지 기다리지 않고 걷어낸다.
+	// (CloseAllPhaseWidgets에 넣지 않는 건 제작→정답에서 깜빡이지 않게 하기 위해서다)
+	if (CurrentPhase != ESIGamePhase::BuildPhase && CurrentPhase != ESIGamePhase::GuessPhase)
+	{
+		CloseControlGuideWidget();
+	}
 
 	if (ASICharacter* SICharacter = Cast<ASICharacter>(GetPawn()))
 	{

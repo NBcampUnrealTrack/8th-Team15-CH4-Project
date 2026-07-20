@@ -12,6 +12,7 @@
 class ASIGameState;
 
 class USIParticipantsListWidget;
+class USIControlGuideWidget;
 class USIScoreBoardWidget;
 class USIDrawingToolWidget;
 class USIMainMenuWidget;
@@ -131,9 +132,14 @@ private:
 	void RemovedScoreBoardWidget();
 	
 	void OpenParticipantsListWidget();
-	
+
 	void CloseParticipantsListWidget();
-	
+
+	// F1을 누르고 있는 동안만 조작 가이드를 띄운다 (제작/정답 단계 한정)
+	void OpenControlGuideWidget();
+
+	void CloseControlGuideWidget();
+
 	void CloseAllPhaseWidgets();
 
 	UFUNCTION()
@@ -179,7 +185,14 @@ private:
 	
 	UPROPERTY()
 	TObjectPtr<USIParticipantsListWidget> ParticipantsListWidget;
-	
+
+	//========== ControlGuideWidget ==========
+	UPROPERTY(EditDefaultsOnly, Category= "ControlGuideWidget", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USIControlGuideWidget> ControlGuideWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<USIControlGuideWidget> ControlGuideWidget;
+
 	#pragma endregion
 	
 #pragma region Sound
