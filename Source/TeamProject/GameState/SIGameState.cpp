@@ -1,5 +1,6 @@
 
 #include "SIGameState.h"
+#include "GameInstance/SIGameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
@@ -121,6 +122,15 @@ void ASIGameState::Multicast_BroadcastAnswerResult_Implementation(const FAnswerR
 void ASIGameState::Multicast_BroadcastMatchEnded_Implementation()
 {
 	OnMatchEnded.Broadcast();
+}
+
+void ASIGameState::Multicast_ShowLoadingScreen_Implementation()
+{
+	// 데디케이티드 서버엔 띄울 화면이 없다
+	if (USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>())
+	{
+		SIInstance->ShowLoadingScreen();
+	}
 }
 
 void ASIGameState::Multicast_BroadcastChatMessage_Implementation(const FChatMessagePayload& Payload)

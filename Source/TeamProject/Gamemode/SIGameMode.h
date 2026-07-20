@@ -114,6 +114,10 @@ private:
 	FTimerHandle GameTimerHandle;
 	FTimerHandle UITimerTickHandle;
 
+	// 결과 화면이 끝나고 로비로 복귀하기까지의 타이머들입니다.
+	FTimerHandle ReturnToLobbyTimerHandle;
+	FTimerHandle ResultLoadingScreenTimerHandle;
+
 	int32 CurrentWorkspaceIndex = -1;
 	
 	void ApplyHostMatchSettings();
@@ -128,4 +132,5 @@ private:
 	void StartNextGuessTurn();
 	void EndGuessTurn();
 	void EndMatch();
+	void ReturnToLobby();
 };

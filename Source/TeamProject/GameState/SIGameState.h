@@ -110,6 +110,10 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_BroadcastMatchEnded();
 
+	/** 트래블 직전에 모든 클라이언트의 로딩 화면을 올린다. 내리는 건 GameInstance가 알아서 한다. */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ShowLoadingScreen();
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnChatMessageSignature OnChatMessage;
 

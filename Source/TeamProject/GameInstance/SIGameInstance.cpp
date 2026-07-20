@@ -2,8 +2,14 @@
 
 
 #include "SIGameInstance.h"
+#include "UI/SILodingWidget.h"
 
+#include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
+#include "UObject/UObjectGlobals.h"
 
 namespace
 {
@@ -19,6 +25,141 @@ void USIGameInstance::Init()
 	if (USISessionSubsystem* SessionSubsystem = GetSubsystem<USISessionSubsystem>())
 	{
 		SessionSubsystem->OnSessionLeftEvent.AddUniqueDynamic(this, &USIGameInstance::HandleSessionLeft);
+	}
+
+	PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+		this, &USIGameInstance::HandlePostLoadMap);
+}
+
+void USIGameInstance::Shutdown()
+{
+	if (PostLoadMapHandle.IsValid())
+	{
+		FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+		PostLoadMapHandle.Reset();
+	}
+
+	Super::Shutdown();
+}
+
+void USIGameInstance::ShowLoadingScreen()
+{
+	// 띄울 위젯이 없으면 트래블을 건너 살려둘 이유도 없다.
+	// 여기서 끊지 않으면 폴링이 매 틱 생성을 재시도하며 로그를 도배한다.
+	if (!LoadingWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GameInstance] 로딩 화면 생략: BP_GameInstance의 LoadingWidgetClass가 비어 있음"));
+		return;
+	}
+
+	bLoadingScreenActive = true;
+	LoadingScreenElapsedTime = 0.0f;
+
+	CreateLoadingWidget();
+}
+
+void USIGameInstance::HideLoadingScreen()
+{
+	bLoadingScreenActive = false;
+	LoadingScreenElapsedTime = 0.0f;
+
+	ClearLoadingScreenTimer();
+	RemoveLoadingWidget();
+}
+
+void USIGameInstance::RemoveLoadingWidget()
+{
+	if (IsValid(LoadingWidget))
+	{
+		LoadingWidget->RemoveFromParent();
+	}
+
+	LoadingWidget = nullptr;
+}
+
+void USIGameInstance::CreateLoadingWidget()
+{
+	if (IsValid(LoadingWidget) && LoadingWidget->IsInViewport())
+	{
+		return;
+	}
+
+	// 클래스 유효성은 ShowLoadingScreen에서 이미 걸렀다
+
+	// 어느 뷰포트에 붙을지 정해주려면 로컬 PC가 필요하다.
+	// 트래블 직후엔 아직 없을 수 있어 실패해도 그냥 넘어가고 폴링이 다시 시도한다.
+	APlayerController* PC = GetFirstLocalPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	LoadingWidget = CreateWidget<USILodingWidget>(PC, LoadingWidgetClass);
+	if (!IsValid(LoadingWidget))
+	{
+		return;
+	}
+
+	LoadingWidget->AddToViewport(LoadingScreenZOrder);
+}
+
+void USIGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+	if (!bLoadingScreenActive || !IsValid(LoadedWorld))
+	{
+		return;
+	}
+
+	// PostLoadMapWithWorld는 전역 델리게이트라 PIE에선 다른 창의 맵 로드까지 여기로 들어온다.
+	// 걸러내지 않으면 남의 로드에 반응해 내 뷰포트의 위젯을 놓치고 새로 만들어, 뗄 수 없는 위젯이 화면에 남는다.
+	if (LoadedWorld->GetGameInstance() != this)
+	{
+		return;
+	}
+
+	// 이전 월드와 함께 사라졌을 위젯 — 살아 있다면 확실히 떼고 새로 만든다
+	RemoveLoadingWidget();
+	LoadingScreenElapsedTime = 0.0f;
+
+	CreateLoadingWidget();
+
+	LoadedWorld->GetTimerManager().SetTimer(
+		LoadingScreenPollTimer, this, &USIGameInstance::PollLevelReady,
+		LoadingScreenPollInterval, true);
+}
+
+void USIGameInstance::PollLevelReady()
+{
+	LoadingScreenElapsedTime += LoadingScreenPollInterval;
+
+	// PC 생성이 늦었다면 이 시점에 위젯이 비어 있을 수 있다
+	CreateLoadingWidget();
+
+	const UWorld* World = GetWorld();
+	const APlayerController* PC = GetFirstLocalPlayerController();
+
+	// GameState까지 와야 로비/인게임 위젯들이 구독할 대상이 생긴다.
+	// 그 전에 로딩 화면을 내리면 텅 빈 UI가 한 프레임 노출된다.
+	const bool bLevelReady = IsValid(World) && PC && IsValid(World->GetGameState());
+
+	if (bLevelReady || LoadingScreenElapsedTime >= MaxLoadingScreenSeconds)
+	{
+		if (!bLevelReady)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GameInstance] 로딩 화면 타임아웃(%.0f초) — 준비 신호 없이 내림"), MaxLoadingScreenSeconds);
+		}
+
+		HideLoadingScreen();
+	}
+}
+
+void USIGameInstance::ClearLoadingScreenTimer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(LoadingScreenPollTimer);
 	}
 }
 

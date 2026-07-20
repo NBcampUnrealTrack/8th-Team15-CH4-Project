@@ -240,6 +240,11 @@ void ASILobbyGameMode::RequestStartGame(ASIPlayerState* RequestingPlayerState)
 	SIInstance->PreparePendingMatch(SIState->PlayerArray.Num());
 	SIState->Mulitcast_GameStartSound();
 
+	// 버튼을 누르는 즉시 로딩 화면으로 덮는다.
+	// 트래블 직전에 띄우면 반응이 없는 대기 구간이 생기고, 이 화면은 조작 가이드를 담고 있어
+	// 시작 사운드가 흐르는 동안 읽히는 편이 낫다.
+	SIState->Multicast_ShowLoadingScreen();
+
 	FTimerHandle TravelTimerHandle;
 	float StartDelay = 3.0f;
 

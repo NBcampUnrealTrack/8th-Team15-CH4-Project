@@ -4,7 +4,8 @@
 #include "PlayerController/SIPlayerController.h"
 #include "Character/SICharacter.h"
 #include "GameMode/SIGameMode.h"         
-#include "GameState/SIGameState.h"        
+#include "GameState/SIGameState.h"
+#include "PlayerState/SIPlayerState.h"
 #include "UI/SIDrawingToolWidget.h"
 #include "UI/SILobbySettingWidget.h"
 #include "UI/SIHUDWidget.h"
@@ -272,12 +273,25 @@ void ASIPlayerController::SetupInputComponent()
 
 void ASIPlayerController::RemovedScoreBoardWidget()
 {
-	if (CurrentPhase == ESIGamePhase::ResultPhase)
+	if (CurrentPhase != ESIGamePhase::ResultPhase)
 	{
-		if (IsValid(ScoreBoardWidget))
-		{
-			ScoreBoardWidget->RemoveFromParent();
-		}
+		return;
+	}
+
+	if (IsValid(ScoreBoardWidget))
+	{
+		ScoreBoardWidget->RemoveFromParent();
+	}
+
+	// 점수판을 닫은 자리에 빈 게임 화면이 드러나지 않도록 곧바로 로딩 화면을 덮는다.
+	//
+	// 이건 순전히 로컬 연출이다. 리슨 서버에서는 클라이언트가 서버와 다른 맵에 있을 수 없어
+	// 혼자 먼저 로비로 갈 방법이 없고(복귀 전까지 로비 맵은 존재하지도 않는다),
+	// 실제 이동은 서버가 전원을 동시에 옮긴다.
+	// 그래서 여기서 할 수 있는 건 "내 화면만 먼저 넘긴다"까지다.
+	if (USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>())
+	{
+		SIInstance->ShowLoadingScreen();
 	}
 }
 

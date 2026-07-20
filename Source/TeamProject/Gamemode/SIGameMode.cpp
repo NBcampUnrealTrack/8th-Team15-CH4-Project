@@ -718,10 +718,30 @@ void ASIGameMode::EndMatch()
 		SIState->Multicast_BroadcastMatchEnded();
 	}
 
-	FTimerHandle ReturnTimerHandle;
-	GetWorldTimerManager().SetTimer(ReturnTimerHandle, [this]()
+	// 점수판을 이만큼 보여준 뒤 로비로 돌아간다
+	constexpr float ScoreBoardDuration = 5.0f;
+
+	// 복귀 직전에 로딩 화면으로 점수판을 덮는다.
+	// 트래블과 같은 프레임에 쏘면 클라가 멀티캐스트보다 맵 이동을 먼저 처리할 수 있어 여유를 둔다.
+	constexpr float LoadingScreenLeadTime = 0.5f;
+
+	GetWorldTimerManager().SetTimer(ResultLoadingScreenTimerHandle, [this]()
 	{
-		ProcessServerTravel(
-			TEXT("/Game/Shape_It/Level/Test_Lobby?listen?game=/Script/TeamProject.SILobbyGameMode"));
-	}, 5.0f, false);
+		if (ASIGameState* SIState = GetGameState<ASIGameState>())
+		{
+			SIState->Multicast_ShowLoadingScreen();
+		}
+	}, ScoreBoardDuration - LoadingScreenLeadTime, false);
+
+	GetWorldTimerManager().SetTimer(
+		ReturnToLobbyTimerHandle, this, &ASIGameMode::ReturnToLobby, ScoreBoardDuration, false);
+}
+
+void ASIGameMode::ReturnToLobby()
+{
+	GetWorldTimerManager().ClearTimer(ReturnToLobbyTimerHandle);
+	GetWorldTimerManager().ClearTimer(ResultLoadingScreenTimerHandle);
+
+	ProcessServerTravel(
+		TEXT("/Game/Shape_It/Level/Test_Lobby?listen?game=/Script/TeamProject.SILobbyGameMode"));
 }
