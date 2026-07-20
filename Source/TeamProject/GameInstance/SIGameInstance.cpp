@@ -301,6 +301,38 @@ void USIGameInstance::ConsumeMatchRosterEntry(const FUniqueNetIdRepl& PlayerId)
 	}
 }
 
+void USIGameInstance::SealReturningRoster(const TArray<APlayerState*>& Players)
+{
+	ReturningRosterIds.Empty();
+
+	for (const APlayerState* Player : Players)
+	{
+		if (!IsValid(Player))
+		{
+			continue;
+		}
+
+		const FUniqueNetIdRepl& PlayerId = Player->GetUniqueId();
+		if (PlayerId.IsValid())
+		{
+			ReturningRosterIds.Add(PlayerId.ToString());
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[GameInstance] 로비 복귀 명단 봉인: %d명 (입장 안내 생략 대상)"),
+		ReturningRosterIds.Num());
+}
+
+bool USIGameInstance::ConsumeReturningRosterEntry(const FUniqueNetIdRepl& PlayerId)
+{
+	if (!PlayerId.IsValid())
+	{
+		return false;
+	}
+
+	return ReturningRosterIds.Remove(PlayerId.ToString()) > 0;
+}
+
 void USIGameInstance::AddChatLog(const FString& SenderName, const FString& Message)
 {
 	FChatLogEntry& Entry = ChatHistory.AddDefaulted_GetRef();

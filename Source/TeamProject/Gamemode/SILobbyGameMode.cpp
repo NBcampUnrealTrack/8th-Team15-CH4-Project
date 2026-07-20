@@ -161,9 +161,15 @@ void ASILobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		{
 			SIState->Multicast_BroadcastPlayerJoined(JoinedPlayerState);
 
+			// 매치를 마치고 돌아온 사람은 새 입장이 아니다.
+			// 복귀 트래블도 전원의 PostLogin을 다시 태우므로 걸러내지 않으면 인원수만큼 안내가 반복된다.
+			USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>();
+			const bool bIsReturningFromMatch = SIInstance
+				&& SIInstance->ConsumeReturningRosterEntry(JoinedPlayerState->GetUniqueId());
+
 			// 호스트는 제외한다 — 방을 만든 사람이 자기 방에 "입장했습니다"는 어색하다.
 			// 리슨 서버의 호스트만 원격 커넥션이 없다(PostLogin 앞쪽의 호스트 판정과 같은 기준).
-			if (NewPlayer->GetNetConnection() != nullptr)
+			if (NewPlayer->GetNetConnection() != nullptr && !bIsReturningFromMatch)
 			{
 				SIState->AnnouncePlayerJoined(JoinedPlayerState);
 			}

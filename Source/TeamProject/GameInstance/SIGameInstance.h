@@ -61,6 +61,14 @@ public:
 	// 명단에 남겨두면 "통과는 되는데 게임은 못 하는" 상태가 되므로, 들어온 즉시 표를 회수한다.
 	void ConsumeMatchRosterEntry(const FUniqueNetIdRepl& PlayerId);
 
+	// ── 매치 종료 후 로비로 되돌아오는 인원 명단 (서버 전용, travel 생존) ──
+	// 복귀 트래블도 전원의 PostLogin을 다시 태우므로, 걸러내지 않으면 로비에 도착하자마자
+	// "OO님이 입장했습니다"가 인원수만큼 다시 뜬다. 매치 명단과 같은 1회용 입장권 방식이다.
+	void SealReturningRoster(const TArray<APlayerState*>& Players);
+
+	// 명단에 있었으면 표를 회수하고 true를 반환한다(= 새 입장이 아니라 복귀).
+	bool ConsumeReturningRosterEntry(const FUniqueNetIdRepl& PlayerId);
+
 	void AddChatLog(const FString& SenderName, const FString& Message);
 	const TArray<FChatLogEntry>& GetChatHistory() const { return ChatHistory; }
 	void ClearChatHistory();
@@ -121,6 +129,9 @@ private:
 
 	// FUniqueNetIdRepl 대신 문자열로 보관 — 로그로 눈으로 확인하기 쉽고 해싱 걱정이 없다.
 	TSet<FString> MatchRosterIds;
+
+	// 복귀 명단은 봉인 플래그가 필요 없다 — 비어 있으면 그냥 복귀자가 없다는 뜻이다.
+	TSet<FString> ReturningRosterIds;
 	
 	UPROPERTY()
 	int32 ExpectedPlayerCount = 0;

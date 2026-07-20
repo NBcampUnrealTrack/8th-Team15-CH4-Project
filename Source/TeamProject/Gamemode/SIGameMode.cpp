@@ -838,6 +838,16 @@ void ASIGameMode::ReturnToLobby()
 	// 이 뒤로 쏟아지는 Logout은 트래블 때문이지 퇴장이 아니다 (Logout의 안내 억제용).
 	bTravelRequested = true;
 
+	// 도착한 로비가 "이 사람들은 새로 들어온 게 아니라 돌아온 것"을 알 수 있게 명단을 넘긴다.
+	// GameInstance는 논심리스 트래블을 넘어 살아남으므로 이 경로로만 전달이 가능하다.
+	if (USIGameInstance* SIInstance = GetGameInstance<USIGameInstance>())
+	{
+		if (const ASIGameState* SIState = GetGameState<ASIGameState>())
+		{
+			SIInstance->SealReturningRoster(SIState->PlayerArray);
+		}
+	}
+
 	ProcessServerTravel(
 		TEXT("/Game/Shape_It/Level/Test_Lobby?listen?game=/Script/TeamProject.SILobbyGameMode"));
 }
