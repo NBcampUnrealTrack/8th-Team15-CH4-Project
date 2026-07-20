@@ -183,7 +183,16 @@ void ASILobbyGameMode::Logout(AController* Exiting)
 
 			// 호스트 이탈은 알리지 않는다 — 리슨 서버라 방 자체가 사라지므로
 			// 남은 사람은 이 안내 대신 "호스트가 나갔습니다" 팝업을 보고 메인메뉴로 돌아간다.
-			if (Exiting->GetNetConnection() != nullptr)
+			//
+			// ★ 여기서 GetNetConnection()으로 호스트를 가리면 안 된다.
+			//   APlayerController::OnNetCleanup이 NetConnection = NULL로 만든 뒤에 Destroy를 부르고,
+			//   그 Destroy가 Logout을 호출한다. 즉 Logout 시점엔 참가자도 커넥션이 null이라
+			//   전원이 호스트로 오인되어 안내가 통째로 사라진다(입장은 되는데 퇴장만 안 뜨는 증상).
+			//   PostLogin에서 확정해둔 bIsHost는 이 시점에도 남아 있으므로 그것으로 판단한다.
+			const ASIPlayerState* ExitingSIState = Cast<ASIPlayerState>(ExitingPlayerState);
+			const bool bExitingPlayerIsHost = IsValid(ExitingSIState) && ExitingSIState->bIsHost;
+
+			if (!bExitingPlayerIsHost)
 			{
 				SIState->AnnouncePlayerLeft(ExitingPlayerState);
 			}
