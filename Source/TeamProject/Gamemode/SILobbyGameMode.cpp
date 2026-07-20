@@ -86,6 +86,29 @@ void ASILobbyGameMode::PreLogin(const FString& Options, const FString& Address, 
 	}
 }
 
+AActor* ASILobbyGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	AActor* ChosenStart = Super::ChoosePlayerStart_Implementation(Player);
+
+	if (!IsValid(ChosenStart))
+	{
+		// 여기 걸리면 레벨에 쓸 수 있는 PlayerStart가 하나도 없다는 뜻.
+		// 엔진은 이 경우 폰을 아예 스폰하지 않는다(관전 카메라만 남는다).
+		UE_LOG(LogTemp, Error,
+			TEXT("[Lobby][Spawn] %s: 사용 가능한 PlayerStart를 찾지 못했습니다. "
+				"Test_Lobby의 PlayerStart 배치를 확인하세요."),
+			*GetNameSafe(Player));
+		return ChosenStart;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[Lobby][Spawn] %s -> %s %s"),
+		*GetNameSafe(Player),
+		*ChosenStart->GetActorNameOrLabel(),
+		*ChosenStart->GetActorLocation().ToCompactString());
+
+	return ChosenStart;
+}
+
 void ASILobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();

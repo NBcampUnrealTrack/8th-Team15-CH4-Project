@@ -2,6 +2,8 @@
 
 #include "Character/SICharacter.h"
 #include "Engine/DataTable.h"
+#include "EngineUtils.h"				// TActorIterator
+#include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameInstance/SIGameInstance.h"
 #include "GameFramework/Pawn.h"
@@ -130,6 +132,33 @@ void ASIGameMode::BeginPlay()
 			Subsystem->SetSessionInProgress(true);
 		}
 	}
+}
+
+AActor* ASIGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	// 1순위: 엔진 기본 선택 (비어 있는 PlayerStart → 비켜설 자리가 있는 PlayerStart)
+	if (AActor* ChosenStart = Super::ChoosePlayerStart_Implementation(Player))
+	{
+		return ChosenStart;
+	}
+
+	// 2순위: 자리가 겹치더라도 아무 PlayerStart나 쓴다.
+	// 여기까지 왔다는 건 "쓸 수 있는 자리가 없다"는 뜻인데, 그대로 nullptr을 돌려주면
+	// 엔진이 폰 생성을 포기해 조작 불가능한 관전 카메라만 남는다(플레이 자체가 불가).
+	// 겹쳐 스폰되는 건 잠깐이고 곧 작업공간으로 재배치되므로 이쪽이 훨씬 낫다.
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GameMode][Spawn] 비어 있는 PlayerStart가 없어 %s를 겹쳐서 스폰합니다. "
+				"MainLevel의 PlayerStart 개수를 최대 인원(%d)만큼 늘리는 것을 권장합니다."),
+			*GetNameSafe(Player), MaxPlayers);
+		return *It;
+	}
+
+	UE_LOG(LogTemp, Error,
+		TEXT("[GameMode][Spawn] 레벨에 PlayerStart가 하나도 없습니다. %s의 폰을 스폰할 수 없습니다."),
+		*GetNameSafe(Player));
+	return nullptr;
 }
 
 void ASIGameMode::PreLogin(const FString& Options, const FString& Address,

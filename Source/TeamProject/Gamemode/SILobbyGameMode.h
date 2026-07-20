@@ -20,6 +20,12 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
+	/** 스폰 위치 선택은 엔진 기본 동작(PlayerStart 중 랜덤)을 그대로 쓴다.
+		여기서 하는 일은 "누가 어느 PlayerStart의 어디에 떴는지"를 남기는 것뿐 —
+		'로비와 엉뚱한 곳에 스폰된다'는 증상이 재현됐을 때 레벨 배치 문제인지
+		PlayerStart를 못 찾은 것인지 로그만으로 구분하기 위해서다. */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
 	void RequestStartGame(ASIPlayerState* RequestingPlayerState);
 
 	/** 호스트가 로비에서 방 설정을 바꿨을 때의 서버측 처리 지점.

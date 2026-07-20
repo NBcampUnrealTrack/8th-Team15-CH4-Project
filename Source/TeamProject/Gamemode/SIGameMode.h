@@ -40,6 +40,13 @@ public:
 	virtual void PreLogin(const FString& Options, const FString& Address,
 		const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 
+	/** PlayerStart가 부족해 폰이 아예 스폰되지 않는 것을 막는다.
+		엔진 기본 동작은 PlayerStart가 점유돼 있고 주변에 비켜설 자리도 없으면 nullptr을 반환하고,
+		그러면 RestartPlayerAtPlayerStart가 폰을 만들지 않고 끝낸다(= 조작 불가능한 관전 카메라).
+		이 레벨은 스폰 직후 SpawnPlayersToIndividualWorkspaces가 전원을 각자 작업공간으로
+		재배치하므로 최초 스폰 위치가 겹쳐도 무해하다 → 겹치더라도 스폰시키는 쪽이 옳다. */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
