@@ -40,6 +40,12 @@ void USILobbySettingWidget::NativeConstruct()
 				this, &USILobbySettingWidget::HandleRoomSettingCommitted);
 		}
 	}
+
+	if (IsValid(EditableText_RoomPassword))
+	{
+		EditableText_RoomPassword->OnTextChanged.AddDynamic(
+			this, &USILobbySettingWidget::HandleRoomPasswordChanged);
+	}
 }
 
 void USILobbySettingWidget::NativeDestruct()
@@ -62,6 +68,12 @@ void USILobbySettingWidget::NativeDestruct()
 			SettingText->OnTextCommitted.RemoveDynamic(
 				this, &USILobbySettingWidget::HandleRoomSettingCommitted);
 		}
+	}
+
+	if (IsValid(EditableText_RoomPassword))
+	{
+		EditableText_RoomPassword->OnTextChanged.RemoveDynamic(
+			this, &USILobbySettingWidget::HandleRoomPasswordChanged);
 	}
 
 	if (CachedPlayerState.IsValid())
@@ -107,6 +119,11 @@ void USILobbySettingWidget::RequestLeaveRoom()
 	{
 		SIInstance->LeaveRoom();
 	}
+}
+
+void USILobbySettingWidget::HandleRoomPasswordChanged(const FText& Text)
+{
+	FilterEditableTextToDigits(EditableText_RoomPassword, Text);
 }
 
 void USILobbySettingWidget::HandleRoomSettingCommitted(const FText& Text, const ETextCommit::Type CommitMethod)

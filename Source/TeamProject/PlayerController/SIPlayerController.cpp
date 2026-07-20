@@ -327,10 +327,22 @@ void ASIPlayerController::CloseParticipantsListWidget()
 	}
 }
 
+/** 이 단계에서 F1 조작 가이드를 띄울 수 있는가.
+	여는 조건과 "단계가 바뀌면 걷어내는" 조건이 반드시 같아야 해서 한 곳에 둔다.
+	(한쪽만 고치면 가이드가 없는 단계로 넘어갔을 때 영영 안 닫히거나,
+	 띄울 수 있는 단계인데 진입하자마자 사라지는 버그가 난다)
+	로비: 캐릭터를 조작해 돌아다닐 수 있으므로 안내할 조작이 있다.
+	결과 화면: 순위만 보는 화면이라 제외. */
+static bool IsControlGuideAvailableInPhase(const ESIGamePhase Phase)
+{
+	return Phase == ESIGamePhase::LobbyPhase
+		|| Phase == ESIGamePhase::BuildPhase
+		|| Phase == ESIGamePhase::GuessPhase;
+}
+
 void ASIPlayerController::OpenControlGuideWidget()
 {
-	// 제작/정답 단계에서만 — 로비나 결과 화면엔 안내할 조작이 없다
-	if (CurrentPhase != ESIGamePhase::BuildPhase && CurrentPhase != ESIGamePhase::GuessPhase)
+	if (!IsControlGuideAvailableInPhase(CurrentPhase))
 	{
 		return;
 	}
@@ -403,10 +415,10 @@ void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 
 	CloseAllPhaseWidgets();
 
-	// F1을 누른 채로 단계가 넘어갈 수 있다. 제작↔정답 사이 이동이면 그대로 두고,
-	// 가이드가 없는 단계로 갔다면 뗄 때까지 기다리지 않고 걷어낸다.
+	// F1을 누른 채로 단계가 넘어갈 수 있다. 가이드를 띄울 수 있는 단계끼리의 이동이면 그대로 두고,
+	// 없는 단계로 갔다면 뗄 때까지 기다리지 않고 걷어낸다.
 	// (CloseAllPhaseWidgets에 넣지 않는 건 제작→정답에서 깜빡이지 않게 하기 위해서다)
-	if (CurrentPhase != ESIGamePhase::BuildPhase && CurrentPhase != ESIGamePhase::GuessPhase)
+	if (!IsControlGuideAvailableInPhase(CurrentPhase))
 	{
 		CloseControlGuideWidget();
 	}

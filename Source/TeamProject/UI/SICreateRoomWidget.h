@@ -46,4 +46,10 @@ private:
 
 	UFUNCTION()
 	void HandleCreateClicked();
+
+	/** 비밀번호 칸은 숫자만 받는다 (실제 필터는 USIUserWidget::FilterEditableTextToDigits).
+		로비의 방 설정 편집과 규칙을 맞춰야 한다 — 여기서 문자를 허용하면
+		로비에서 그 칸을 건드리는 순간 조용히 지워진다. */
+	UFUNCTION()
+	void HandleRoomPasswordChanged(const FText& Text);
 };

@@ -57,6 +57,10 @@ private:
 	UFUNCTION()
 	void HandleRoomSettingCommitted(const FText& Text, ETextCommit::Type CommitMethod);
 
+	/** 비밀번호 칸은 숫자만 받는다 (실제 필터는 USIUserWidget::FilterEditableTextToDigits) */
+	UFUNCTION()
+	void HandleRoomPasswordChanged(const FText& Text);
+
 	void SubmitRoomSettings();
 	
 private:	

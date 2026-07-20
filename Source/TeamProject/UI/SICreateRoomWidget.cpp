@@ -19,6 +19,17 @@ void USICreateRoomWidget::NativeConstruct()
 	{
 		Button_Create->OnClicked.AddDynamic(this, &USICreateRoomWidget::HandleCreateClicked);
 	}
+
+	if (EditableText_RoomPassword)
+	{
+		EditableText_RoomPassword->OnTextChanged.AddDynamic(
+			this, &USICreateRoomWidget::HandleRoomPasswordChanged);
+	}
+}
+
+void USICreateRoomWidget::HandleRoomPasswordChanged(const FText& Text)
+{
+	FilterEditableTextToDigits(EditableText_RoomPassword, Text);
 }
 
 FSICreateSessionParams USICreateRoomWidget::GetRoomSettings() const
