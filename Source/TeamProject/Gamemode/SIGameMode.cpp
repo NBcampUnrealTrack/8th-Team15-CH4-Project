@@ -20,7 +20,10 @@ namespace
 	constexpr int32 MaxPlayers = 8;
 	constexpr int32 MaxChatLength = 256;
 
-	bool IsKeywordProperty(const FProperty* Property)
+	/** 프로퍼티 이름이 접두어와 맞는지 검사한다.
+		BP에서 만든 구조체의 프로퍼티는 실제 이름이 "Keyword_2_A1B2C3..." 처럼 맹글링되므로
+		정확히 일치(C++ 구조체)와 접두어 일치(BP 구조체)를 둘 다 본다. */
+	bool MatchesPropertyName(const FProperty* Property, const TCHAR* BaseName)
 	{
 		if (!Property)
 		{
@@ -28,24 +31,32 @@ namespace
 		}
 
 		const FString PropertyName = Property->GetName();
-		const FString DisplayName = Property->GetDisplayNameText().ToString();
-		return PropertyName.Equals(TEXT("Keyword"), ESearchCase::IgnoreCase)
-			|| PropertyName.StartsWith(TEXT("Keyword_"), ESearchCase::IgnoreCase)
-			|| DisplayName.Equals(TEXT("Keyword"), ESearchCase::IgnoreCase);
+		if (PropertyName.Equals(BaseName, ESearchCase::IgnoreCase)
+			|| PropertyName.StartsWith(FString(BaseName) + TEXT("_"), ESearchCase::IgnoreCase))
+		{
+			return true;
+		}
+
+#if WITH_EDITORONLY_DATA
+		// FField::GetDisplayNameText()는 WITH_EDITORONLY_DATA 안에 선언된 에디터 전용 API라
+		// 패키징(Game 타겟)에선 함수 자체가 존재하지 않는다. 감싸지 않으면 에디터 빌드만
+		// 통과하고 패키징에서 C2039로 깨진다.
+		// 빠져도 안전한 이유: 표시 이름이 "Keyword"인 BP 프로퍼티는 실제 이름도 "Keyword_..."로
+		// 생성되어 위 StartsWith에 이미 걸린다. 즉 이 검사는 보조 수단이고 매칭 결과는 같다.
+		return Property->GetDisplayNameText().ToString().Equals(BaseName, ESearchCase::IgnoreCase);
+#else
+		return false;
+#endif
+	}
+
+	bool IsKeywordProperty(const FProperty* Property)
+	{
+		return MatchesPropertyName(Property, TEXT("Keyword"));
 	}
 
 	bool IsLevelProperty(const FProperty* Property)
 	{
-		if (!Property)
-		{
-			return false;
-		}
-
-		const FString PropertyName = Property->GetName();
-		const FString DisplayName = Property->GetDisplayNameText().ToString();
-		return PropertyName.Equals(TEXT("Level"), ESearchCase::IgnoreCase)
-			|| PropertyName.StartsWith(TEXT("Level_"), ESearchCase::IgnoreCase)
-			|| DisplayName.Equals(TEXT("Level"), ESearchCase::IgnoreCase);
+		return MatchesPropertyName(Property, TEXT("Level"));
 	}
 
 	FString ReadKeywordValue(const FProperty* Property, const uint8* RowData)
