@@ -630,14 +630,30 @@ void USISessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 		return;
 	}
 
-	// 5) 그 밖의 실패는 이미 방 안에 있다가 끊긴 것 — 세션 정리 후 메인메뉴로 되돌린다.
+	// 5) 그 밖의 실패는 이미 방 안에 있다가 끊긴 것 — 세션을 정리하고 메인메뉴로 되돌린다.
 	//    세션이 없다 = 이미 첫 실패가 정리/통지를 끝냈다는 뜻이므로, 후속 실패는 기록만 하고 조용히 무시
-	if (bHasLiveSession)
+	if (!bHasLiveSession)
+	{
+		return;
+	}
+
+	// ★ 복귀를 우리가 할지 엔진에 맡길지 판단한다.
+	//   엔진은 클라이언트에서 연결이 끊기면 스스로 기본 맵으로 되돌린다
+	//   (UEngine::HandleNetworkFailure: ConnectionLost/Timeout일 때 bShouldTravel = (NetMode == NM_Client)).
+	//   그때 우리까지 OpenLevel을 부르면 메인메뉴가 두 번 로드되고,
+	//   1차 로드에서 뜬 접속 실패 안내창이 2차 로드에 휩쓸려 "잠깐 보였다 사라진다".
+	//   위 4)의 PendingConnectionFailure 분기와 같은 이유이며, 조건만 다르다.
+	//   호스트(리슨 서버)는 엔진이 이동시켜주지 않으므로 우리가 직접 처리해야 한다.
+	const bool bEngineReturnsToDefaultMap =
+		IsValid(NetDriver) && NetDriver->GetNetMode() == NM_Client;
+
+	if (!bEngineReturnsToDefaultMap)
 	{
 		bLeaveInProgress = true;
 		PendingLeaveReason = ESISessionLeaveReason::ConnectionLost;
-		DestroySession();
 	}
+
+	DestroySession();
 }
 
 bool USISessionSubsystem::ConsumeLastFailure(ESIConnectionFailureType& OutType, FString& OutRawMessage)
