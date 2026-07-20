@@ -387,6 +387,10 @@ void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 		break;
 
 	case ESIGamePhase::ResultPhase:
+		if (IsValid(ResultSFX))
+		{
+			UGameplayStatics::PlaySound2D(GetWorld(), ResultSFX);
+		}
 		if (ScoreBoardWidgetClass)
 		{
 			ScoreBoardWidget = CreateWidget<USIScoreBoardWidget>(this, ScoreBoardWidgetClass);
@@ -467,6 +471,7 @@ void ASIPlayerController::UpdateBGMParameters(ESIGamePhase NewPhase)
 		PhaseValue = 0.0f; // 작업 음악 (In 0)
 		break;
 	case ESIGamePhase::GuessPhase:
+	case ESIGamePhase::ResultPhase:
 		PhaseValue = 1.0f; // 정답 음악 (In 1)
 		break;
 	default:

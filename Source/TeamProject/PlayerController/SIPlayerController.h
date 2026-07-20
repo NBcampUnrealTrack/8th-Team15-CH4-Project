@@ -189,8 +189,12 @@ private:
 	UPROPERTY(EditAnywhere, Category = "UI|Sound")
 	TObjectPtr<USoundBase> TabCloseSound;
 	
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> ResultSFX;
+	
 	UPROPERTY(VisibleAnywhere, Category = "Sound")
 	TObjectPtr<UAudioComponent> BGMAudioComponent;
+	
 	
 
 	UPROPERTY(EditAnywhere, Category = "Sound")

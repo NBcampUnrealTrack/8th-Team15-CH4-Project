@@ -2,7 +2,7 @@
 
 
 #include "UI/SIRoomListWidget.h"
-
+#include "kismet/GameplayStatics.h"
 #include "GameInstance/SIGameInstance.h"
 #include "GameInstance/SISessionSubsystem.h"
 #include "UI/SIRoomEntryWidget.h"
@@ -139,6 +139,11 @@ void USIRoomListWidget::RefreshRoomList()
 	if (bRequestInProgress)
 	{
 		return;
+	}
+	
+	if (RefreshSound)
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), RefreshSound);
 	}
 
 	USISessionSubsystem* Subsystem = GetSessionSubsystem();

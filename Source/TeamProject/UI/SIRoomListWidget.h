@@ -13,6 +13,7 @@ class UScrollBox;
 class UTextBlock;
 class USIRoomEntryWidget;
 class USISessionSubsystem;
+class USoundBase;
 
 UCLASS()
 class TEAMPROJECT_API USIRoomListWidget : public USIUserWidget
@@ -42,11 +43,11 @@ private:
 	TObjectPtr<UScrollBox> ScrollBox_RoomList;
 
 	/** 잠긴 방 입장용 비밀번호. 항상 표시되며, 잠기지 않은 방이면 입력값은 무시된다 */
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional,AllowPrivateAccess = "true"))
 	TObjectPtr<UEditableText> EditableText_JoinPassword;
 
 	/** 방 제목 검색 — 치는 대로 목록이 걸러진다 */
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly,meta = (BindWidgetOptional,AllowPrivateAccess = "true"))
 	TObjectPtr<UEditableText> EditableText_RoomNameFilter;
 
 	/** "검색 중…", "방이 없습니다" 같은 안내 문구 */
@@ -60,6 +61,9 @@ private:
 	/** 방 목록 항목 사이 세로 간격(px). 에디터에서 눈으로 보며 조절 */
 	UPROPERTY(EditDefaultsOnly, Category = "Room", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RoomEntrySpacing = 4.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USoundBase> RefreshSound;
 
 private:
 	UFUNCTION()
