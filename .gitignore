@@ -29,3 +29,6 @@ Saved/
 
 CLAUDE.md
 .claude/
+# Windows에서 'git lfs install'이 /dev/null 리다이렉트를 실제 경로로 해석해
+# 만들어내는 훅 사본. 실제 훅은 .git/hooks에 있고 이쪽은 아무도 참조하지 않는다.
+/dev/
