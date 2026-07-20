@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UI/SIUserWidget.h"
+#include "Enums/SITypes.h"	// FChatMessagePayload
 #include "SILobbySettingWidget.generated.h"
 
 class ASIGameState;
@@ -40,6 +41,18 @@ private:
 	
 	UPROPERTY(Meta = (BindWidget))
 	TObjectPtr<UEditableText> EditableText_GuessTimeLimit;
+
+	// ── 채팅 (인게임 HUD와 같은 구성) ──
+	// BindWidgetOptional인 이유: 이 셋이 없어도 로비의 나머지 기능은 그대로 동작해야 한다.
+	UPROPERTY(Meta = (BindWidgetOptional))
+	TObjectPtr<UScrollBox> ScrollBox_ChatLog;
+
+	UPROPERTY(Meta = (BindWidgetOptional))
+	TObjectPtr<UEditableText> EditableText_ChatInput;
+
+	// WBP_LobbySetting 디테일에서 WBP_ChatLine을 지정해야 채팅이 보인다 (HUD와 동일)
+	UPROPERTY(EditDefaultsOnly, Category = "Lobby|Chat", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USIChatLineWidget> ChatLineWidgetClass;
 	
 	TWeakObjectPtr<ASIPlayerState> CachedPlayerState;
 	TWeakObjectPtr<ASIGameState> CachedGameState;
@@ -60,6 +73,18 @@ private:
 	/** 비밀번호 칸은 숫자만 받는다 (실제 필터는 USIUserWidget::FilterEditableTextToDigits) */
 	UFUNCTION()
 	void HandleRoomPasswordChanged(const FText& Text);
+
+	/** ── 채팅 ── 기록은 ASIPlayerController가 남기고 여기선 그리기만 한다 */
+	UFUNCTION()
+	void HandleChatMessage(const FChatMessagePayload& Payload);
+
+	UFUNCTION()
+	void HandleChatCommitted(const FText& Chat, ETextCommit::Type CommitMethod);
+
+public:
+	virtual void FocusChatInput() override;
+
+private:
 
 	void SubmitRoomSettings();
 	

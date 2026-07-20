@@ -39,6 +39,9 @@ void ASIPlayerController::BeginPlay()
 		GetWorldTimerManager().SetTimer(TimerHandle, this, &ASIPlayerController::InitializeLevelBGM, 0.5f, false);
 		
 		TryCacheGameState();
+
+		// 채팅 기록은 위젯이 아니라 여기서 남긴다 (HUD가 없는 로비/결과 화면까지 커버)
+		BindChatHistoryRecorder();
 	}
 }
 
@@ -49,11 +52,18 @@ void ASIPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		GameState->OnPhaseChanged.RemoveDynamic(this, &ASIPlayerController::HandlePhaseChanged);
 	}
 	
+	if (ChatRecorderBoundGameState.IsValid())
+	{
+		ChatRecorderBoundGameState->OnChatMessage.RemoveDynamic(
+			this, &ASIPlayerController::HandleChatMessageForHistory);
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(GameStateRetryHandle);
+		World->GetTimerManager().ClearTimer(ChatRecorderRetryTimer);
 	}
-	
+
 	//사운드 재생 제거
 	if (BGMAudioComponent)
 	{
@@ -113,10 +123,34 @@ void ASIPlayerController::SetTime(int32 Seconds)
 
 void ASIPlayerController::Server_SendChat_Implementation(const FString& Message)
 {
+	// 인게임 — 참가자 명단(PlayerOrderList) 검증까지 포함된 기존 경로
 	if (ASIGameMode* GM = GetWorld()->GetAuthGameMode<ASIGameMode>())
 	{
 		GM->OnChatReceived(this, Message);
+		return;
 	}
+
+	// 로비 — ASILobbyGameMode는 ASIGameMode를 상속하지 않아 위 경로를 탈 수 없다.
+	// (그대로 두면 로비에서 채팅이 조용히 사라진다)
+	// GameState는 두 레벨이 공유하므로 여기서 직접 방송한다.
+	// 로비엔 걸러낼 명단이 없고 접속해 있는 것 자체가 참가 자격이므로 길이만 정규화한다.
+	ASIGameState* SIState = GetWorld()->GetGameState<ASIGameState>();
+	if (!IsValid(SIState) || !IsValid(PlayerState))
+	{
+		return;
+	}
+
+	FString NormalizedMessage = Message.TrimStartAndEnd();
+	if (NormalizedMessage.IsEmpty())
+	{
+		return;
+	}
+	NormalizedMessage.LeftInline(SIChatLimits::MaxMessageLength);
+
+	FChatMessagePayload Payload;
+	Payload.Sender = PlayerState;
+	Payload.Message = NormalizedMessage;
+	SIState->Multicast_BroadcastChatMessage(Payload);
 }
 
 // ==========================================
@@ -181,10 +215,55 @@ void ASIPlayerController::ReceivedPlayer()
 
 }
 
+void ASIPlayerController::RegisterChatWidget(USIUserWidget* ChatWidget)
+{
+	ActiveChatWidget = ChatWidget;
+}
+
+void ASIPlayerController::UnregisterChatWidget(const USIUserWidget* ChatWidget)
+{
+	// 새 위젯이 이미 등록을 마친 뒤에 옛 위젯이 소멸할 수 있다.
+	// 자기가 등록한 것일 때만 지워야 방금 등록된 위젯을 날리지 않는다.
+	if (ActiveChatWidget.Get() == ChatWidget)
+	{
+		ActiveChatWidget.Reset();
+	}
+}
+
+void ASIPlayerController::BindChatHistoryRecorder()
+{
+	ASIGameState* SIState = GetWorld() ? GetWorld()->GetGameState<ASIGameState>() : nullptr;
+	if (!IsValid(SIState))
+	{
+		// 클라이언트에선 GameState 복제가 PC보다 늦을 수 있다 — 이 코드베이스의 0.1초 재시도 패턴
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				ChatRecorderRetryTimer, this, &ASIPlayerController::BindChatHistoryRecorder, 0.1f, false);
+		}
+		return;
+	}
+
+	ChatRecorderBoundGameState = SIState;
+	SIState->OnChatMessage.AddDynamic(this, &ASIPlayerController::HandleChatMessageForHistory);
+}
+
+void ASIPlayerController::HandleChatMessageForHistory(const FChatMessagePayload& Payload)
+{
+	// Sender는 APlayerState* 라 레벨 이동을 넘기면 전부 null이 된다.
+	// 받는 즉시 이름을 문자열로 박제해야 travel 후에도 "???"가 되지 않는다.
+	const FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
+
+	if (USIGameInstance* GI = GetGameInstance<USIGameInstance>())
+	{
+		GI->AddChatLog(SenderName, Payload.Message);
+	}
+}
+
 void ASIPlayerController::FocusChat()
 {
-	// 이미 채팅 중이거나 HUD가 없으면 무시
-	if (bChatFocused || !IsValid(HUDWidget))
+	// 이미 채팅 중이거나 화면에 채팅창이 없으면 무시
+	if (bChatFocused || !ActiveChatWidget.IsValid())
 	{
 		return;
 	}
@@ -208,9 +287,9 @@ void ASIPlayerController::FocusChat()
 	GetWorld()->GetTimerManager().SetTimerForNextTick(
 		FTimerDelegate::CreateWeakLambda(this, [this]()
 		{
-			if (bChatFocused && IsValid(HUDWidget))
+			if (bChatFocused && ActiveChatWidget.IsValid())
 			{
-				HUDWidget->FocusChatInput();
+				ActiveChatWidget->FocusChatInput();
 			}
 		}));
 }

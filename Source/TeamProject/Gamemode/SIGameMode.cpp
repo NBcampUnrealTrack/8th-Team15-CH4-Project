@@ -18,7 +18,8 @@
 namespace
 {
 	constexpr int32 MaxPlayers = 8;
-	constexpr int32 MaxChatLength = 256;
+	// 로비 채팅도 같은 한도를 써야 하므로 실제 값은 SITypes.h의 SIChatLimits에 있다
+	constexpr int32 MaxChatLength = SIChatLimits::MaxMessageLength;
 
 	/** 프로퍼티 이름이 접두어와 맞는지 검사한다.
 		BP에서 만든 구조체의 프로퍼티는 실제 이름이 "Keyword_2_A1B2C3..." 처럼 맹글링되므로

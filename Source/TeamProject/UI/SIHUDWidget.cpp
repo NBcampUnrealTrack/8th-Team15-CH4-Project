@@ -39,7 +39,14 @@ void USIHUDWidget::NativeConstruct()
 		EditableText_AnswerInput->OnTextCommitted.AddDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
 	}
 
-	RestoreChatHistory();
+	// 과거 대화를 먼저 그리고(복원) → 실시간 구독을 붙인다(BindGameData) 순서를 지킨다
+	RestoreChatHistoryTo(ScrollBox_ChatLog, ChatLineWidgetClass);
+
+	// Enter 포커스가 이 위젯의 채팅창으로 오도록 등록
+	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
+	{
+		PC->RegisterChatWidget(this);
+	}
 
 	// GameState/PlayerState 의존 배선은 준비될 때까지 재시도
 	BindGameData();
@@ -104,6 +111,11 @@ void USIHUDWidget::NativeDestruct()
 		EditableText_AnswerInput->OnTextCommitted.RemoveDynamic(this, &USIHUDWidget::HandleAnswerCommitted);
 	}
 	
+	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
+	{
+		PC->UnregisterChatWidget(this);
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(ResultHideTimerHandle);
@@ -208,49 +220,11 @@ void USIHUDWidget::FocusChatInput()
 	}
 }
 
-void USIHUDWidget::AddChatLineToScrollBox(const FString& SenderName, const FString& Message)
-{
-	if (!IsValid(ScrollBox_ChatLog) || !ChatLineWidgetClass)
-	{
-		return;
-	}
-
-	USIChatLineWidget* Line = CreateWidget<USIChatLineWidget>(this, ChatLineWidgetClass);
-	if (!IsValid(Line))
-	{
-		return;
-	}
-
-	Line->SetMessage(SenderName, Message);
-
-	ScrollBox_ChatLog->AddChild(Line);
-	ScrollBox_ChatLog->ScrollToEnd();
-}
-
-void USIHUDWidget::RestoreChatHistory()
-{
-	USIGameInstance* GI = GetGameInstance<USIGameInstance>();
-	if (!IsValid(GI))
-	{
-		return;
-	}
-
-	for (const FChatLogEntry& Entry : GI->GetChatHistory())
-	{
-		AddChatLineToScrollBox(Entry.SenderName, Entry.Message);
-	}
-}
-
 void USIHUDWidget::HandleChatMessage(const FChatMessagePayload& Payload)
 {
+	// 저장은 ASIPlayerController가 한다 — 여기서 또 저장하면 같은 줄이 두 번 쌓인다
 	const FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
-
-	if (USIGameInstance* GI = GetGameInstance<USIGameInstance>())
-	{
-		GI->AddChatLog(SenderName, Payload.Message);
-	}
-
-	AddChatLineToScrollBox(SenderName, Payload.Message);
+	AddChatLineTo(ScrollBox_ChatLog, ChatLineWidgetClass, SenderName, Payload.Message);
 }
 
 void USIHUDWidget::HandleAnswerResult(const FAnswerResultPayload& Payload)

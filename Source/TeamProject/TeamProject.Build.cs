@@ -16,7 +16,10 @@ public class TeamProject : ModuleRules
 			// UI
 			"UMG", "Slate", "SlateCore",
 			// Online
-			"OnlineSubsystem", "OnlineSubsystemUtils",
+			// CoreOnline: FUniqueNetIdRepl/FUniqueNetIdWrapper의 구현이 있는 모듈.
+			// 헤더는 Engine을 통해 딸려 오지만 링크는 별도라, 빠뜨리면
+			// ToString() 같은 호출에서 LNK2019(unresolved external)가 난다.
+			"OnlineSubsystem", "OnlineSubsystemUtils", "CoreOnline",
         });
 		
 		// Online Subsystem 구현체 — 어느 쪽을 쓸지는 DefaultEngine.ini의 DefaultPlatformService가 정한다.

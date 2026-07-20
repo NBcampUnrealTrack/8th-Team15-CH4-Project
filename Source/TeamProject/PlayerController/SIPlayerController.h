@@ -18,6 +18,7 @@ class USIDrawingToolWidget;
 class USIMainMenuWidget;
 class USILobbySettingWidget;
 class USIHUDWidget;
+class USIUserWidget;
 class UAudioComponent;
 class UInputAction;
 class USoundBase;
@@ -118,9 +119,29 @@ public:
 	// 채팅 전송/취소 후 다시 GameOnly 입력 모드로 복귀한다. (HUD가 커밋 시 호출)
 	void EndChatFocus();
 
+	/** 지금 화면에 있는 채팅창을 알려준다. 인게임 HUD와 로비 방 설정 위젯이
+		각자 생성/소멸 시점에 자기를 등록/해제하고, Enter 포커스는 여기 등록된 쪽으로 간다.
+		HUD를 직접 가리키면 HUD가 없는 로비에서 Enter가 먹지 않는다. */
+	void RegisterChatWidget(USIUserWidget* ChatWidget);
+	void UnregisterChatWidget(const USIUserWidget* ChatWidget);
+
 private:
 	// 현재 채팅 입력 모드인지 (Enter 중복 처리 방지)
 	bool bChatFocused = false;
+
+	// 현재 활성 채팅창 (인게임 HUD 또는 로비 위젯). 레벨과 함께 사라지므로 약참조.
+	TWeakObjectPtr<USIUserWidget> ActiveChatWidget;
+
+	/** 채팅 로그의 저장 주체. 위젯이 아니라 PlayerController가 맡는다 —
+		위젯은 페이즈마다 생성·파괴되지만 PC는 레벨 내내 살아 있어
+		HUD가 없는 로비/결과 화면의 채팅도 빠짐없이 기록된다. 위젯은 읽어서 그리기만 한다. */
+	UFUNCTION()
+	void HandleChatMessageForHistory(const FChatMessagePayload& Payload);
+
+	void BindChatHistoryRecorder();
+
+	FTimerHandle ChatRecorderRetryTimer;
+	TWeakObjectPtr<ASIGameState> ChatRecorderBoundGameState;
 
 private:
 	

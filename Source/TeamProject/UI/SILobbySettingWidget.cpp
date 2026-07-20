@@ -12,6 +12,9 @@
 #include "TimerManager.h"
 #include "Components/Button.h"
 #include "Components/EditableText.h"
+#include "Components/ScrollBox.h"
+#include "PlayerController/SIPlayerController.h"
+#include "UI/SIChatLineWidget.h"
 
 void USILobbySettingWidget::NativeConstruct()
 {
@@ -45,6 +48,64 @@ void USILobbySettingWidget::NativeConstruct()
 	{
 		EditableText_RoomPassword->OnTextChanged.AddDynamic(
 			this, &USILobbySettingWidget::HandleRoomPasswordChanged);
+	}
+
+	if (IsValid(EditableText_ChatInput))
+	{
+		EditableText_ChatInput->OnTextCommitted.AddDynamic(
+			this, &USILobbySettingWidget::HandleChatCommitted);
+	}
+
+	// 과거 대화를 먼저 그리고 → 실시간 구독을 붙인다.
+	// (순서가 반대면 복원 중에 들어온 메시지가 뒤엉킨다)
+	RestoreChatHistoryTo(ScrollBox_ChatLog, ChatLineWidgetClass);
+
+	// Enter 포커스가 이 위젯의 채팅창으로 오도록 등록 (로비엔 HUD가 없다)
+	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
+	{
+		PC->RegisterChatWidget(this);
+	}
+}
+
+void USILobbySettingWidget::FocusChatInput()
+{
+	if (IsValid(EditableText_ChatInput))
+	{
+		EditableText_ChatInput->SetKeyboardFocus();
+	}
+}
+
+void USILobbySettingWidget::HandleChatMessage(const FChatMessagePayload& Payload)
+{
+	// 저장은 ASIPlayerController가 한다 — 여기서 또 저장하면 같은 줄이 두 번 쌓인다
+	const FString SenderName = IsValid(Payload.Sender) ? Payload.Sender->GetPlayerName() : TEXT("???");
+	AddChatLineTo(ScrollBox_ChatLog, ChatLineWidgetClass, SenderName, Payload.Message);
+}
+
+void USILobbySettingWidget::HandleChatCommitted(const FText& Chat, const ETextCommit::Type CommitMethod)
+{
+	if (CommitMethod != ETextCommit::OnEnter)
+	{
+		return;
+	}
+
+	ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>();
+	const FString Message = Chat.ToString().TrimStartAndEnd();
+
+	if (!Message.IsEmpty() && IsValid(PC))
+	{
+		PC->Server_SendChat(Message);
+	}
+
+	if (IsValid(EditableText_ChatInput))
+	{
+		EditableText_ChatInput->SetText(FText::GetEmpty());
+	}
+
+	// 빈 메시지로 엔터를 쳐도 입력 모드는 닫는다 (HUD와 동일한 동작)
+	if (IsValid(PC))
+	{
+		PC->EndChatFocus();
 	}
 }
 
@@ -84,6 +145,18 @@ void USILobbySettingWidget::NativeDestruct()
 	if (CachedGameState.IsValid())
 	{
 		CachedGameState->OnLobbyRoomInfoChanged.RemoveDynamic(this, &USILobbySettingWidget::RefreshRoomInfo);
+		CachedGameState->OnChatMessage.RemoveDynamic(this, &USILobbySettingWidget::HandleChatMessage);
+	}
+
+	if (IsValid(EditableText_ChatInput))
+	{
+		EditableText_ChatInput->OnTextCommitted.RemoveDynamic(
+			this, &USILobbySettingWidget::HandleChatCommitted);
+	}
+
+	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
+	{
+		PC->UnregisterChatWidget(this);
 	}
 
 	if (UWorld* World = GetWorld())
@@ -252,6 +325,7 @@ void USILobbySettingWidget::ResolveRoomInfo()
 	CachedGameState = GS;
 
 	GS->OnLobbyRoomInfoChanged.AddDynamic(this, &USILobbySettingWidget::RefreshRoomInfo);
+	GS->OnChatMessage.AddDynamic(this, &USILobbySettingWidget::HandleChatMessage);
 	RefreshRoomInfo();
 }
 

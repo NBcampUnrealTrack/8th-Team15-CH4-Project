@@ -4,6 +4,43 @@
 #include "UI/SIUserWidget.h"
 
 #include "Components/EditableText.h"
+#include "Components/ScrollBox.h"
+#include "GameInstance/SIGameInstance.h"
+#include "UI/SIChatLineWidget.h"
+
+void USIUserWidget::AddChatLineTo(UScrollBox* ScrollBox, TSubclassOf<USIChatLineWidget> LineClass,
+	const FString& SenderName, const FString& Message)
+{
+	if (!IsValid(ScrollBox) || !LineClass)
+	{
+		return;
+	}
+
+	USIChatLineWidget* Line = CreateWidget<USIChatLineWidget>(this, LineClass);
+	if (!IsValid(Line))
+	{
+		return;
+	}
+
+	Line->SetMessage(SenderName, Message);
+
+	ScrollBox->AddChild(Line);
+	ScrollBox->ScrollToEnd();
+}
+
+void USIUserWidget::RestoreChatHistoryTo(UScrollBox* ScrollBox, TSubclassOf<USIChatLineWidget> LineClass)
+{
+	const USIGameInstance* GI = GetGameInstance<USIGameInstance>();
+	if (!IsValid(GI))
+	{
+		return;
+	}
+
+	for (const FChatLogEntry& Entry : GI->GetChatHistory())
+	{
+		AddChatLineTo(ScrollBox, LineClass, Entry.SenderName, Entry.Message);
+	}
+}
 
 void USIUserWidget::FilterEditableTextToDigits(UEditableText* Target, const FText& Text)
 {

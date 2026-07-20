@@ -3,6 +3,14 @@
 #include "CoreMinimal.h"
 #include "SITypes.generated.h"
 
+/** 채팅 공통 제한 — 인게임(ASIGameMode)과 로비(ASILobbyGameMode)가 같은 값을 봐야 한다.
+	로비 GameMode는 ASIGameMode를 상속하지 않아 검증 코드를 공유할 수 없으므로,
+	최소한 한도만이라도 한 곳에서 관리한다. */
+namespace SIChatLimits
+{
+	static constexpr int32 MaxMessageLength = 256;
+}
+
 /**
  * 게임의 현재 진행 단계
  */

@@ -44,7 +44,7 @@ public:
 	void SetSecretWord(const FString& NewSecretWord);
 
 	// 채팅 입력창에 키보드 포커스를 준다 (PlayerController가 채팅 열 때 호출)
-	void FocusChatInput();
+	virtual void FocusChatInput() override;
 	
 private:	
 	UPROPERTY(meta = (BindWidget))
@@ -93,8 +93,8 @@ private:
 	void ShowResult(bool bCorrect);
 	void HideResult();
 
-	void AddChatLineToScrollBox(const FString& SenderName, const FString& Message);
-	void RestoreChatHistory();
+	// 그리기는 USIUserWidget의 공용 헬퍼(AddChatLineTo/RestoreChatHistoryTo)를 쓴다.
+	// 기록은 ASIPlayerController가 담당하므로 여기선 저장하지 않는다.
 	
 	UFUNCTION()
 	void HandlePhaseChanged(ESIGamePhase NewPhase);
