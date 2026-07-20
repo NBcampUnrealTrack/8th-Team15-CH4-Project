@@ -60,7 +60,7 @@ void USIRoomListWidget::NativeConstruct()
 	}
 
 	// 목록을 열자마자 한 번 검색
-	RefreshRoomList();
+	RefreshRoomList(false);
 }
 
 void USIRoomListWidget::FocusForKeyboardShortcuts()
@@ -133,7 +133,7 @@ USISessionSubsystem* USIRoomListWidget::GetSessionSubsystem() const
 	return IsValid(GameInstanceRef) ? GameInstanceRef->GetSubsystem<USISessionSubsystem>() : nullptr;
 }
 
-void USIRoomListWidget::RefreshRoomList()
+void USIRoomListWidget::RefreshRoomList(bool bPlaySound)
 {
 	// F5 연타/버튼 중복 클릭 방어 — 검색이나 입장이 진행 중이면 무시
 	if (bRequestInProgress)
@@ -141,7 +141,7 @@ void USIRoomListWidget::RefreshRoomList()
 		return;
 	}
 	
-	if (RefreshSound)
+	if (bPlaySound && RefreshSound)
 	{
 		UGameplayStatics::PlaySound2D(GetWorld(), RefreshSound);
 	}
