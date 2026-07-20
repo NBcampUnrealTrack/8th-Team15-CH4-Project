@@ -76,6 +76,7 @@ void USIHUDWidget::BindGameData()
 	GS->OnTimeUpdated.AddDynamic(this, &USIHUDWidget::HandleTimeUpdated);
 	GS->OnChatMessage.AddDynamic(this, &USIHUDWidget::HandleChatMessage);
 	GS->OnAnswerResult.AddDynamic(this, &USIHUDWidget::HandleAnswerResult);
+	GS->OnWorkspaceOwnerChanged.AddDynamic(this, &USIHUDWidget::HandleWorkspaceOwnerChanged);
 
 	CachedPlayerState = PS;
 	PS->OnScoreUpdated.AddDynamic(this, &USIHUDWidget::HandleScoreUpdated);
@@ -83,6 +84,7 @@ void USIHUDWidget::BindGameData()
 	// 초기 상태 즉시 반영 (이미 진행 중인 게임에 접속하는 케이스)
 	HandlePhaseChanged(GS->CurrentGamePhase);
 	HandleTimeUpdated(GS->RemainingTime);
+	HandleWorkspaceOwnerChanged(GS->CurrentWorkspaceOwner);
 	HandleScoreUpdated(PS->CurrentScore);
 }
 
@@ -94,6 +96,7 @@ void USIHUDWidget::NativeDestruct()
 		CachedGameState->OnTimeUpdated.RemoveDynamic(this, &USIHUDWidget::HandleTimeUpdated);
 		CachedGameState->OnChatMessage.RemoveDynamic(this, &USIHUDWidget::HandleChatMessage);
 		CachedGameState->OnAnswerResult.RemoveDynamic(this, &USIHUDWidget::HandleAnswerResult);
+		CachedGameState->OnWorkspaceOwnerChanged.RemoveDynamic(this, &USIHUDWidget::HandleWorkspaceOwnerChanged);
 	}
 	
 	if (CachedPlayerState.IsValid())
@@ -186,6 +189,8 @@ void USIHUDWidget::HandlePhaseChanged(ESIGamePhase NewPhase)
 		}
 	}
 
+	RefreshWorkspaceOwnerText();
+
 	// 제시어: BuildPhase엔 표시(그리는 사람이 봐야 함), GuessPhase엔 숨김(맞추는 사람에게 정답 노출 방지)
 	if (IsValid(Text_Keyword))
 	{
@@ -210,6 +215,36 @@ void USIHUDWidget::HandleTimeUpdated(int32 NewTime)
 	}
 	
 	Text_Timer->SetText(FText::Format(INVTEXT("남은 시간 - {0}"),NewTime));
+}
+
+void USIHUDWidget::HandleWorkspaceOwnerChanged(APlayerState* NewWorkspaceOwner)
+{
+	CurrentWorkspaceOwner = NewWorkspaceOwner;
+	RefreshWorkspaceOwnerText();
+}
+
+void USIHUDWidget::RefreshWorkspaceOwnerText()
+{
+	if (!IsValid(Text_WorkspaceOwner))
+	{
+		return;
+	}
+
+	// GuessPhase가 아니면 감상할 작품 자체가 없다.
+	if (CurrentPhase != ESIGamePhase::GuessPhase || !IsValid(CurrentWorkspaceOwner))
+	{
+		Text_WorkspaceOwner->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
+
+	// 자기 차례인 사람은 정답을 이미 알고 있다 → 문구를 갈라 헷갈리지 않게 한다.
+	const bool bIsMine = (CachedPlayerState.IsValid() && CurrentWorkspaceOwner == CachedPlayerState.Get());
+	const FText Message = bIsMine
+		? INVTEXT("자기 자신의 작품은 맞출 수 없습니다!")
+		: FText::Format(INVTEXT("{0}님의 작품을 맞춰주세요!"), FText::FromString(CurrentWorkspaceOwner->GetPlayerName()));
+
+	Text_WorkspaceOwner->SetText(Message);
+	Text_WorkspaceOwner->SetVisibility(ESlateVisibility::Visible);
 }
 
 void USIHUDWidget::FocusChatInput()
