@@ -97,12 +97,12 @@ bool USISessionSubsystem::EnsureSessionInterface()
 		// SessionInterface 사용 가능하다면 true 반환
 		if (SessionInterface.IsValid())
 		{
-			PrintNS(FString::Printf(TEXT("Found Subsystem: %s"), *Subsystem->GetSubsystemName().ToString()));
+			// PrintNS(FString::Printf(TEXT("Found Subsystem: %s"), *Subsystem->GetSubsystemName().ToString()));
 			return true;
 		}
 	}
 
-	PrintNS(TEXT("ERROR: SessionInterface unavailable"), FColor::Red);
+	// PrintNS(TEXT("ERROR: SessionInterface unavailable"), FColor::Red);
 	return false;
 }
 
@@ -126,7 +126,7 @@ void USISessionSubsystem::CreateSession(const FSICreateSessionParams& Params)
 	// 기존 세션이 있으면: 파괴를 요청하고, 생성은 완료 콜백이 이어받는다 (비동기 체인)
 	if (SessionInterface->GetNamedSession(NAME_GameSession))
 	{
-		PrintNS(TEXT("Existing session found. Destroy -> Create chain..."));
+		// PrintNS(TEXT("Existing session found. Destroy -> Create chain..."));
 		bCreateSessionOnDestroy = true;
 		DestroySession();
 		return;
@@ -157,12 +157,12 @@ void USISessionSubsystem::CreateSessionInternal()
 		SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(
 			FOnCreateSessionCompleteDelegate::CreateUObject(this, &USISessionSubsystem::OnCreateSessionComplete));
 
-	PrintNS(TEXT("Creating session..."));
+	// PrintNS(TEXT("Creating session..."));
 	if (!SessionInterface->CreateSession(0, NAME_GameSession, SessionSettings))
 	{
 		// 요청 자체가 즉시 거부된 경우 (콜백이 안 올 수 있으므로 여기서 정리+방송)
 		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
-		PrintNS(TEXT("CreateSession request REJECTED"), FColor::Red);
+		// PrintNS(TEXT("CreateSession request REJECTED"), FColor::Red);
 		OnCreateSessionCompleteEvent.Broadcast(false);
 	}
 }
@@ -170,8 +170,8 @@ void USISessionSubsystem::CreateSessionInternal()
 void USISessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
 	SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
-	PrintNS(FString::Printf(TEXT("Create Complete: %s"), bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL")),
-		bWasSuccessful ? FColor::Green : FColor::Red);
+	// PrintNS(FString::Printf(TEXT("Create Complete: %s"), bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAIL")),
+	// 	bWasSuccessful ? FColor::Green : FColor::Red);
 
 	// 서브시스템은 여기까지. 어느 맵을 listen으로 열지는 구독자(게임 쪽)의 결정
 	OnCreateSessionCompleteEvent.Broadcast(bWasSuccessful);
