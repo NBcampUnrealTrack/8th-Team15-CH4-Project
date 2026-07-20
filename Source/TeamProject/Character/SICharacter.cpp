@@ -1260,20 +1260,14 @@ void ASICharacter::HandleShapeEditingPhaseChanged(const ESIGamePhase NewPhase)
 	SetHoveredShape(nullptr);
 	ClearPreview();
 
-	// 백틱으로 UI 모드에 들어가 있었다면 도형 편집 정리 후에도 그 상태를 유지한다.
+	// 도형 편집 UI 모드(백틱)는 제작 단계 전용이다.
+	// 제작이 끝났는데 그대로 두면 SetIgnoreMoveInput/LookInput(true)이 걸린 채로 남아
+	// 정답 단계에서 캐릭터를 전혀 조작할 수 없게 된다(백틱을 다시 눌러야만 풀림).
+	// ToggleUIOnlyMode의 해제 경로가 입력 차단 해제 + GameOnly 복귀 + 커서 숨김 +
+	// FlushPressedKeys까지 모두 처리하므로 그대로 재사용한다.
 	if (bIsUIOnlyMode)
 	{
-		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
-		{
-			PlayerController->SetIgnoreMoveInput(true);
-			PlayerController->SetIgnoreLookInput(true);
-
-			FInputModeGameAndUI InputMode;
-			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-			InputMode.SetHideCursorDuringCapture(false);
-			PlayerController->SetInputMode(InputMode);
-			PlayerController->bShowMouseCursor = true;
-		}
+		ToggleUIOnlyMode();
 	}
 }
 
