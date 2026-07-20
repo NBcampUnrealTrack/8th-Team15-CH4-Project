@@ -31,15 +31,23 @@ static const FName KEY_IN_PROGRESS(TEXT("SI_IN_PROGRESS"));
 	두 함수는 반드시 짝으로 쓸 것. */
 static FString EncodeRoomTitleForAdvertising(const FString& RawTitle)
 {
-	return FBase64::Encode(RawTitle);
+	// ★ FString을 받는 FBase64::Encode/Decode 오버로드를 쓰면 안 된다.
+	//   Encode(FString)은 내부에서 TCHAR_TO_ANSI를, Decode(FString,FString&)은 ANSI_TO_TCHAR를 쓴다
+	//   (Engine/Source/Runtime/Core/Private/Misc/Base64.cpp).
+	//   = 우리가 우회하려던 바로 그 손실 변환이라, Base64로 감싸기도 전에 한글이 깨진다.
+	//   반드시 UTF-8 바이트로 바꾼 뒤 바이트 오버로드를 쓸 것.
+	const FTCHARToUTF8 Utf8Title(*RawTitle);
+	return FBase64::Encode(
+		reinterpret_cast<const uint8*>(Utf8Title.Get()), Utf8Title.Length());
 }
 
 static FString DecodeAdvertisedRoomTitle(const FString& AdvertisedTitle)
 {
-	FString Decoded;
-	if (FBase64::Decode(AdvertisedTitle, Decoded))
+	TArray<uint8> Utf8Bytes;
+	if (FBase64::Decode(AdvertisedTitle, Utf8Bytes))
 	{
-		return Decoded;
+		Utf8Bytes.Add(0);   // UTF8_TO_TCHAR는 널 종단 문자열을 기대한다
+		return UTF8_TO_TCHAR(reinterpret_cast<const UTF8CHAR*>(Utf8Bytes.GetData()));
 	}
 
 	// 디코드 실패 = Base64가 아님. 구버전 클라이언트가 만든 방이거나
