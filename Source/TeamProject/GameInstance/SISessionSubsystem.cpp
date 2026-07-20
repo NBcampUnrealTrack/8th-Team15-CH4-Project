@@ -18,6 +18,16 @@ static const FName KEY_ROOM_TITLE(TEXT("SI_ROOM_TITLE"));
 static const FName KEY_HAS_PASSWORD(TEXT("SI_HAS_PASSWORD"));
 static const FName KEY_IN_PROGRESS(TEXT("SI_IN_PROGRESS"));
 
+/** 우리 게임의 방임을 식별하는 표식.
+	개발용 AppID 480(Spacewar)은 전 세계 개발자가 공유하기 때문에, 스팀 로비 검색에는
+	전혀 다른 게임의 방들이 함께 잡힌다(실측: 6개 중 우리 것이 아닌 방이 다수).
+	엔진이 파싱 못 하는 키를 가진 방은 알아서 탈락하지만 그것만으로는 부족해서,
+	우리가 붙인 표식이 있는 방만 목록에 올린다.
+	방 제목으로 거르지 않는 이유: 제목이 비면 엔진이 그 키를 아예 광고하지 않는다
+	(GetLobbyKeyValuePairsFromSessionSettings의 SettingStr.IsEmpty() 분기). */
+static const FName KEY_GAME_ID(TEXT("SI_GAME_ID"));
+static const FString SI_GAME_ID_VALUE(TEXT("SHAPEIT"));
+
 /** ── 한글 방 제목 우회 (UE 5.5 OnlineSubsystemSteam 인코딩 버그) ──
 	스팀 로비 데이터의 왕복 인코딩이 어긋나 있다.
 	  쓰기: SetLobbyData(..., TCHAR_TO_UTF8(*Value))        → UTF-8
@@ -207,6 +217,10 @@ void USISessionSubsystem::CreateSessionInternal()
 	SessionSettings.bUseLobbiesIfAvailable = true;
 	
 	// ── 커스텀 데이터 광고: 검색자가 목록에서 볼 정보만. Password는 절대 넣지 않는다 ──
+	// 우리 게임 방이라는 표식 — 검색 결과에서 남의 게임 로비를 걸러내는 기준
+	SessionSettings.Set(KEY_GAME_ID, SI_GAME_ID_VALUE,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+
 	SessionSettings.Set(KEY_ROOM_TITLE, EncodeRoomTitleForAdvertising(PendingParams.RoomTitle),
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 	SessionSettings.Set(KEY_HAS_PASSWORD, PendingParams.Password.IsEmpty() ? 0 : 1,
@@ -282,6 +296,15 @@ void USISessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		for (int32 i = 0; i < SessionSearch->SearchResults.Num(); ++i)
 		{
 			const FOnlineSessionSearchResult& R = SessionSearch->SearchResults[i];
+
+			// 남의 게임 로비 걸러내기 (AppID 480 공유 문제 — KEY_GAME_ID 주석 참고).
+			// 표식이 없거나 값이 다르면 우리 방이 아니다.
+			FString FoundGameId;
+			R.Session.SessionSettings.Get(KEY_GAME_ID, FoundGameId);
+			if (FoundGameId != SI_GAME_ID_VALUE)
+			{
+				continue;
+			}
 
 			FSISessionInfo Info;
 			Info.SearchResultIndex = i;
