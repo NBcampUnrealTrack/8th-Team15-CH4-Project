@@ -10,6 +10,7 @@
 #include "SIPlayerController.generated.h"
 
 class ASIGameState;
+class APlayerState;
 
 class USIParticipantsListWidget;
 class USIControlGuideWidget;
@@ -47,7 +48,7 @@ public:
 	// [Client -> Server] 정답을 서버로 제출하는 RPC
 	// ==========================================
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Game|Network")
-	void Server_SubmitAnswer(const FString& Answer);
+	void Server_SubmitAnswer(const FString& Answer, int32 SubmittedRound);
 
 	// ==========================================
 	// [Server -> Client] 출제자에게 정답(제시어)을 몰래 알려주는 RPC
@@ -147,6 +148,11 @@ private:
 	
 	UFUNCTION()
 	void HandlePhaseChanged(ESIGamePhase NewPhase);
+
+	UFUNCTION()
+	void HandleWorkspaceOwnerChanged(APlayerState* NewWorkspaceOwner);
+
+	void RefreshTurnWidgets();
 	
 	void TryCacheGameState();
 	

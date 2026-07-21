@@ -25,11 +25,22 @@ void USICreateRoomWidget::NativeConstruct()
 		EditableText_RoomPassword->OnTextChanged.AddDynamic(
 			this, &USICreateRoomWidget::HandleRoomPasswordChanged);
 	}
+
+	if (EditableText_MaxPlacedShapeCount)
+	{
+		EditableText_MaxPlacedShapeCount->OnTextChanged.AddDynamic(
+			this, &USICreateRoomWidget::HandleMaxPlacedShapeCountChanged);
+	}
 }
 
 void USICreateRoomWidget::HandleRoomPasswordChanged(const FText& Text)
 {
 	FilterEditableTextToDigits(EditableText_RoomPassword, Text);
+}
+
+void USICreateRoomWidget::HandleMaxPlacedShapeCountChanged(const FText& Text)
+{
+	FilterEditableTextToDigits(EditableText_MaxPlacedShapeCount, Text);
 }
 
 FSICreateSessionParams USICreateRoomWidget::GetRoomSettings() const
@@ -38,7 +49,9 @@ FSICreateSessionParams USICreateRoomWidget::GetRoomSettings() const
 
 	const FString RoomTitle = EditableText_RoomName->GetText().ToString();
 	const int32 BuildTime = FCString::Atoi(*EditableText_BuildTimeLimit->GetText().ToString());
-	const int32 GuessTime = FCString::Atoi(*EditableText_GuessTimeLimit->GetText().ToString());
+	const int32 MaxPlacedShapeCount = EditableText_MaxPlacedShapeCount
+		? FCString::Atoi(*EditableText_MaxPlacedShapeCount->GetText().ToString())
+		: SIRoomSettingLimits::DefaultPlacedShapeCount;
 
 	// 빈칸이면 대입하지 않아 구조체 기본값이 살아남는다.
 	// 시간은 0 이하가 "미지정" 센티널 — GameMode가 자기 기본값을 쓴다.
@@ -55,10 +68,10 @@ FSICreateSessionParams USICreateRoomWidget::GetRoomSettings() const
 		Settings.BuildTime = BuildTime;
 	}
 
-	if (GuessTime > 0)
-	{
-		Settings.GuessTime = GuessTime;
-	}
+	Settings.MaxPlacedShapeCount = FMath::Clamp(
+		MaxPlacedShapeCount > 0 ? MaxPlacedShapeCount : SIRoomSettingLimits::DefaultPlacedShapeCount,
+		SIRoomSettingLimits::MinPlacedShapeCount,
+		SIRoomSettingLimits::MaxPlacedShapeCount);
 
 	return Settings;
 }

@@ -67,7 +67,7 @@ void ASIPlayerState::OnRep_CurrentScore()
 // ----------------------------------------------------
 
 void ASIPlayerState::Server_UpdateRoomSettings_Implementation(const FString& RoomTitle, const FString& Password,
-	const float BuildTime, const float GuessTime)
+	const float BuildTime, const int32 MaxPlacedShapeCount)
 {
 	// 위젯에서 이미 막고 있지만, RPC는 누구나 부를 수 있으므로 서버가 다시 확인한다
 	if (!bIsHost)
@@ -78,7 +78,7 @@ void ASIPlayerState::Server_UpdateRoomSettings_Implementation(const FString& Roo
 
 	if (ASILobbyGameMode* LobbyGameMode = GetWorld()->GetAuthGameMode<ASILobbyGameMode>())
 	{
-		LobbyGameMode->UpdateRoomSettings(this, RoomTitle, Password, BuildTime, GuessTime);
+		LobbyGameMode->UpdateRoomSettings(this, RoomTitle, Password, BuildTime, MaxPlacedShapeCount);
 	}
 }
 

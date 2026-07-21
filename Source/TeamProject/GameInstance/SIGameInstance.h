@@ -56,7 +56,7 @@ public:
 	bool IsInMatchRoster(const FUniqueNetIdRepl& PlayerId) const;
 
 	// 명단은 1회용 입장권이다. 실제로 입장을 마치면 소모시킨다.
-	// 이유: 워크스페이스 배정(SpawnPlayersToIndividualWorkspaces)은 매치 시작 시 1회뿐이라,
+	// 이유: 워크스페이스 배정(AssignPlayerWorkspaces)은 매치 시작 시 1회뿐이라,
 	// 게임 도중 튕겨서 재접속한 사람은 배정받을 자리가 없어 폰 없이 카메라만 남는다.
 	// 명단에 남겨두면 "통과는 되는데 게임은 못 하는" 상태가 되므로, 들어온 즉시 표를 회수한다.
 	void ConsumeMatchRosterEntry(const FUniqueNetIdRepl& PlayerId);

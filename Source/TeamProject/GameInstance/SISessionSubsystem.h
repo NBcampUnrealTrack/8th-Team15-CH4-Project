@@ -21,8 +21,9 @@ namespace SIRoomSettingLimits
 {
 	static constexpr float MinBuildTime = 30.0f;
 	static constexpr float MaxBuildTime = 600.0f;
-	static constexpr float MinGuessTime = 10.0f;
-	static constexpr float MaxGuessTime = 120.0f;
+	static constexpr int32 MinPlacedShapeCount = 10;
+	static constexpr int32 MaxPlacedShapeCount = 40;
+	static constexpr int32 DefaultPlacedShapeCount = 25;
 }
 
 /** 방 생성 시 UI에서 받아오는 설정 묶음 */
@@ -45,9 +46,9 @@ struct FSICreateSessionParams
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
 	float BuildTime = 0.0f;
 
-	/** 정답 제한 시간(초). 0 이하 = GameMode 기본값 사용 */
+	/** 플레이어 한 명이 설치할 수 있는 최대 도형 개수 */
 	UPROPERTY(BlueprintReadWrite, Category = "Session")
-	float GuessTime = 0.0f;
+	int32 MaxPlacedShapeCount = SIRoomSettingLimits::DefaultPlacedShapeCount;
 };
 
 /** BP로 내보낼 검색 결과 요약 (FOnlineSessionSearchResult는 USTRUCT가 아니라 직접 노출 불가) */

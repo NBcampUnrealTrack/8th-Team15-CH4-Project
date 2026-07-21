@@ -130,6 +130,8 @@ void USIHUDWidget::NativeDestruct()
 
 void USIHUDWidget::ShowResult(bool bCorrect)
 {
+	constexpr float AnswerResultDisplayDuration = 1.5f;
+
 	if (!IsValid(VerticalBox_CorrectAnswer) || !IsValid(VerticalBox_InCorrectAnswer))
 	{
 		return;
@@ -139,13 +141,15 @@ void USIHUDWidget::ShowResult(bool bCorrect)
 	{
 		VerticalBox_CorrectAnswer->SetVisibility(ESlateVisibility::Visible);
 		
-		GetWorld()->GetTimerManager().SetTimer(ResultHideTimerHandle, this, &USIHUDWidget::HideResult, 1.5f, false);
+		GetWorld()->GetTimerManager().SetTimer(
+			ResultHideTimerHandle, this, &USIHUDWidget::HideResult, AnswerResultDisplayDuration, false);
 	}
 	else
 	{
 		VerticalBox_InCorrectAnswer->SetVisibility(ESlateVisibility::Visible);
 		
-		GetWorld()->GetTimerManager().SetTimer(ResultHideTimerHandle, this, &USIHUDWidget::HideResult, 1.5f, false);
+		GetWorld()->GetTimerManager().SetTimer(
+			ResultHideTimerHandle, this, &USIHUDWidget::HideResult, AnswerResultDisplayDuration, false);
 	}
 }
 
@@ -170,11 +174,43 @@ void USIHUDWidget::SetSecretWord(const FString& NewSecretWord)
 	{
 		Text_Keyword->SetText(FText::Format(INVTEXT("제시어 - {0}"), FText::FromString(NewSecretWord)));
 	}
+
+	RefreshTurnRoleVisibility();
+}
+
+void USIHUDWidget::RefreshTurnRoleVisibility()
+{
+	if (CurrentPhase != ESIGamePhase::TurnPhase)
+	{
+		return;
+	}
+
+	const bool bIsBuilder = CachedPlayerState.IsValid()
+		&& CurrentWorkspaceOwner == CachedPlayerState.Get();
+
+	if (IsValid(EditableText_AnswerInput))
+	{
+		EditableText_AnswerInput->SetVisibility(
+			bIsBuilder ? ESlateVisibility::Hidden : ESlateVisibility::Visible);
+	}
+
+	if (IsValid(Text_Keyword))
+	{
+		Text_Keyword->SetVisibility(
+			bIsBuilder ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+	}
+
+	RefreshWorkspaceOwnerText();
 }
 
 void USIHUDWidget::HandlePhaseChanged(ESIGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
+	if (NewPhase == ESIGamePhase::TurnPhase)
+	{
+		RefreshTurnRoleVisibility();
+		return;
+	}
 
 	// 정답 입력창: BuildPhase엔 숨김, GuessPhase엔 표시
 	if (IsValid(EditableText_AnswerInput))
@@ -220,7 +256,11 @@ void USIHUDWidget::HandleTimeUpdated(int32 NewTime)
 void USIHUDWidget::HandleWorkspaceOwnerChanged(APlayerState* NewWorkspaceOwner)
 {
 	CurrentWorkspaceOwner = NewWorkspaceOwner;
-	RefreshWorkspaceOwnerText();
+	RefreshTurnRoleVisibility();
+	if (CurrentPhase != ESIGamePhase::TurnPhase)
+	{
+		RefreshWorkspaceOwnerText();
+	}
 }
 
 void USIHUDWidget::RefreshWorkspaceOwnerText()
@@ -230,8 +270,8 @@ void USIHUDWidget::RefreshWorkspaceOwnerText()
 		return;
 	}
 
-	// GuessPhase가 아니면 감상할 작품 자체가 없다.
-	if (CurrentPhase != ESIGamePhase::GuessPhase || !IsValid(CurrentWorkspaceOwner))
+	if ((CurrentPhase != ESIGamePhase::TurnPhase && CurrentPhase != ESIGamePhase::GuessPhase)
+		|| !IsValid(CurrentWorkspaceOwner))
 	{
 		Text_WorkspaceOwner->SetVisibility(ESlateVisibility::Hidden);
 		return;
@@ -240,7 +280,7 @@ void USIHUDWidget::RefreshWorkspaceOwnerText()
 	// 자기 차례인 사람은 정답을 이미 알고 있다 → 문구를 갈라 헷갈리지 않게 한다.
 	const bool bIsMine = (CachedPlayerState.IsValid() && CurrentWorkspaceOwner == CachedPlayerState.Get());
 	const FText Message = bIsMine
-		? INVTEXT("자기 자신의 작품은 맞출 수 없습니다!")
+		? INVTEXT("현재 작품을 제작하고 있습니다!")
 		: FText::Format(INVTEXT("{0}님의 작품을 맞춰주세요!"), FText::FromString(CurrentWorkspaceOwner->GetPlayerName()));
 
 	Text_WorkspaceOwner->SetText(Message);
@@ -310,7 +350,9 @@ void USIHUDWidget::HandleAnswerCommitted(const FText& Answer, ETextCommit::Type 
     
 	if (ASIPlayerController* PC = GetOwningPlayer<ASIPlayerController>())
 	{
-		PC->Server_SubmitAnswer(Message);
+		const int32 Round = CachedGameState.IsValid()
+			? CachedGameState->CurrentRound : INDEX_NONE;
+		PC->Server_SubmitAnswer(Message, Round);
 	}
 	
 	EditableText_AnswerInput->SetText(FText::GetEmpty());

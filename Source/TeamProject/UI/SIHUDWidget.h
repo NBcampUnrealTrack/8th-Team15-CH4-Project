@@ -48,6 +48,8 @@ public:
 	UFUNCTION()
 	void SetSecretWord(const FString& NewSecretWord);
 
+	void RefreshTurnRoleVisibility();
+
 	// 채팅 입력창에 키보드 포커스를 준다 (PlayerController가 채팅 열 때 호출)
 	virtual void FocusChatInput() override;
 	

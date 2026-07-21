@@ -188,6 +188,10 @@ void USISessionSubsystem::CreateSession(const FSICreateSessionParams& Params)
 
 	// 방 설정 전체 보관 (Password 포함 — PreLogin 검증용)
 	PendingParams = Params;
+	PendingParams.MaxPlacedShapeCount = FMath::Clamp(
+		Params.MaxPlacedShapeCount,
+		SIRoomSettingLimits::MinPlacedShapeCount,
+		SIRoomSettingLimits::MaxPlacedShapeCount);
 
 	// 기존 세션이 있으면: 파괴를 요청하고, 생성은 완료 콜백이 이어받는다 (비동기 체인)
 	if (SessionInterface->GetNamedSession(NAME_GameSession))

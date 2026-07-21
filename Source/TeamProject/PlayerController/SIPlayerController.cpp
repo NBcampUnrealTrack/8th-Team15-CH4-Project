@@ -50,6 +50,8 @@ void ASIPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (GameState.IsValid())
 	{
 		GameState->OnPhaseChanged.RemoveDynamic(this, &ASIPlayerController::HandlePhaseChanged);
+		GameState->OnWorkspaceOwnerChanged.RemoveDynamic(
+			this, &ASIPlayerController::HandleWorkspaceOwnerChanged);
 	}
 	
 	if (ChatRecorderBoundGameState.IsValid())
@@ -78,14 +80,14 @@ void ASIPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 // ==========================================
 // [Client -> Server] 정답 제출 실제 구현부
 // ==========================================
-void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answer)
+void ASIPlayerController::Server_SubmitAnswer_Implementation(const FString& Answer, const int32 SubmittedRound)
 {
 	if (HasAuthority())
 	{
 		ASIGameMode* GameMode = GetWorld()->GetAuthGameMode<ASIGameMode>();
 		if (GameMode)
 		{
-			GameMode->OnAnswerSubmitted(this, Answer);
+			GameMode->OnAnswerSubmitted(this, Answer, SubmittedRound);
 		}
 	}
 }
@@ -108,7 +110,8 @@ void ASIPlayerController::Client_ReceiveSecretWord_Implementation(const FString&
 // ==========================================
 void ASIPlayerController::TestAnswer(const FString& Answer)
 {
-	Server_SubmitAnswer(Answer);
+	const ASIGameState* SIState = GetWorld() ? GetWorld()->GetGameState<ASIGameState>() : nullptr;
+	Server_SubmitAnswer(Answer, SIState ? SIState->CurrentRound : INDEX_NONE);
 }
 
 void ASIPlayerController::SetPhase(int32 PhaseIndex)
@@ -166,7 +169,7 @@ void ASIPlayerController::Server_TestSetPhase_Implementation(int32 PhaseIndex)
 			switch (PhaseIndex)
 			{
 			case 1:
-				SIGameState->SetGamePhase(ESIGamePhase::BuildPhase);
+				SIGameState->SetGamePhase(ESIGamePhase::TurnPhase);
 				break;
 			case 2:
 				SIGameState->SetGamePhase(ESIGamePhase::GuessPhase);
@@ -416,6 +419,7 @@ void ASIPlayerController::CloseParticipantsListWidget()
 static bool IsControlGuideAvailableInPhase(const ESIGamePhase Phase)
 {
 	return Phase == ESIGamePhase::LobbyPhase
+		|| Phase == ESIGamePhase::TurnPhase
 		|| Phase == ESIGamePhase::BuildPhase
 		|| Phase == ESIGamePhase::GuessPhase;
 }
@@ -522,6 +526,10 @@ void ASIPlayerController::HandlePhaseChanged(ESIGamePhase NewPhase)
 		}
 		break;
 
+	case ESIGamePhase::TurnPhase:
+		RefreshTurnWidgets();
+		break;
+
 	case ESIGamePhase::BuildPhase:
 		if (HUDWidgetClass && DrawingToolWidgetClass)
 		{
@@ -586,7 +594,71 @@ void ASIPlayerController::TryCacheGameState()
 	}
 	
 	GameState->OnPhaseChanged.AddDynamic(this, &ASIPlayerController::HandlePhaseChanged);
+	GameState->OnWorkspaceOwnerChanged.AddDynamic(
+		this, &ASIPlayerController::HandleWorkspaceOwnerChanged);
 	HandlePhaseChanged(GS->CurrentGamePhase);
+}
+
+void ASIPlayerController::HandleWorkspaceOwnerChanged(APlayerState* NewWorkspaceOwner)
+{
+	if (CurrentPhase != ESIGamePhase::TurnPhase)
+	{
+		return;
+	}
+
+	if (ASICharacter* SICharacter = Cast<ASICharacter>(GetPawn()))
+	{
+		SICharacter->HandleShapeEditingPhaseChanged(CurrentPhase);
+	}
+
+	RefreshTurnWidgets();
+}
+
+void ASIPlayerController::RefreshTurnWidgets()
+{
+	if (CurrentPhase != ESIGamePhase::TurnPhase || !GameState.IsValid())
+	{
+		return;
+	}
+
+	if (DrawingToolWidget)
+	{
+		DrawingToolWidget->OnColorSelected.RemoveDynamic(
+			this, &ThisClass::HandleDrawingToolColorSelected);
+		DrawingToolWidget->RemoveFromParent();
+		DrawingToolWidget = nullptr;
+	}
+
+	if (HUDWidget)
+	{
+		HUDWidget->RemoveFromParent();
+		HUDWidget = nullptr;
+	}
+
+	const bool bIsBuilder = PlayerState
+		&& GameState->CurrentWorkspaceOwner == PlayerState;
+
+	if (HUDWidgetClass)
+	{
+		HUDWidget = CreateWidget<USIHUDWidget>(this, HUDWidgetClass);
+		if (HUDWidget)
+		{
+			HUDWidget->SetSecretWord(CachedSecretWord);
+			HUDWidget->AddToViewport();
+			HUDWidget->RefreshTurnRoleVisibility();
+		}
+	}
+
+	if (bIsBuilder && DrawingToolWidgetClass)
+	{
+		DrawingToolWidget = CreateWidget<USIDrawingToolWidget>(this, DrawingToolWidgetClass);
+		if (DrawingToolWidget)
+		{
+			DrawingToolWidget->OnColorSelected.AddUniqueDynamic(
+				this, &ThisClass::HandleDrawingToolColorSelected);
+			DrawingToolWidget->AddToViewport();
+		}
+	}
 }
 
 
@@ -627,6 +699,7 @@ void ASIPlayerController::UpdateBGMParameters(ESIGamePhase NewPhase)
  
 	switch (NewPhase)
 	{
+	case ESIGamePhase::TurnPhase:
 	case ESIGamePhase::BuildPhase:
 		PhaseValue = 0.0f; // 작업 음악 (In 0)
 		break;

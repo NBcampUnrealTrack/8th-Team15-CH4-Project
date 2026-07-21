@@ -43,8 +43,8 @@ public:
 	/** PlayerStart가 부족해 폰이 아예 스폰되지 않는 것을 막는다.
 		엔진 기본 동작은 PlayerStart가 점유돼 있고 주변에 비켜설 자리도 없으면 nullptr을 반환하고,
 		그러면 RestartPlayerAtPlayerStart가 폰을 만들지 않고 끝낸다(= 조작 불가능한 관전 카메라).
-		이 레벨은 스폰 직후 SpawnPlayersToIndividualWorkspaces가 전원을 각자 작업공간으로
-		재배치하므로 최초 스폰 위치가 겹쳐도 무해하다 → 겹치더라도 스폰시키는 쪽이 옳다. */
+		이 레벨은 턴 시작 시 제작자와 추측자를 각 작업공간 주변으로 재배치하므로
+		최초 스폰 위치가 겹쳐도 무해하다 → 겹치더라도 스폰시키는 쪽이 옳다. */
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
 	virtual void PostLogin(APlayerController* NewPlayer) override;
@@ -61,13 +61,16 @@ public:
 	void OnChatReceived(APlayerController* Sender, const FString& Message);
 
 	// 정답 입력 UI에서 제출된 답을 서버에서 검증하고 점수를 지급합니다.
-	void OnAnswerSubmitted(APlayerController* Submitter, const FString& SubmittedAnswer);
+	void OnAnswerSubmitted(APlayerController* Submitter, const FString& SubmittedAnswer, int32 SubmittedRound);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
 	float BuildTimeLimit = 120.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
-	float GuessTimeLimit = 30.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings|Placement", meta = (ClampMin = "10", ClampMax = "40"))
+	int32 MaxPlacedShapeCount = 25;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Turn", meta = (ClampMin = "0.0"))
+	float CorrectAnswerTransitionDelay = 2.0f;
 
 	// 정답 순위별 점수입니다. 정답자가 배열보다 많으면 마지막 점수를 계속 사용합니다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Settings|Score")
@@ -107,9 +110,10 @@ protected:
 	TObjectPtr<UDataTable> KeywordDataTable;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "GameFlow|Spawn")
-	void SpawnPlayersToIndividualWorkspaces();
+	void AssignPlayerWorkspaces();
 
-	void SpawnPlayersToTargetWorkspace(APlayerController* TargetOwner);
+	bool MoveBuilderToWorkspace(APlayerController* Builder);
+	void SpawnGuessersToTargetWorkspace(APlayerController* TargetOwner);
 
 private:
 	UPROPERTY()
@@ -128,12 +132,14 @@ private:
 
 	FTimerHandle GameTimerHandle;
 	FTimerHandle UITimerTickHandle;
+	FTimerHandle TurnTransitionTimerHandle;
 
 	// 결과 화면이 끝나고 로비로 복귀하기까지의 타이머들입니다.
 	FTimerHandle ReturnToLobbyTimerHandle;
 	FTimerHandle ResultLoadingScreenTimerHandle;
 
 	int32 CurrentWorkspaceIndex = -1;
+	bool bTurnTransitionPending = false;
 
 	// 로비 복귀 트래블이 시작됐는지. 트래블로 인한 Logout을 진짜 퇴장과 구분하는 데 쓴다
 	// (ASILobbyGameMode의 같은 이름 플래그와 같은 역할).
@@ -147,9 +153,14 @@ private:
 	void OnUITimerTick();
 	void BroadcastChat(APlayerController* Sender, const FString& Message);
 
-	void EndBuildPhase();
-	void StartNextGuessTurn();
-	void EndGuessTurn();
+	void StartNextTurn();
+	void EndCurrentTurn();
+	void ScheduleTurnEndAfterAllCorrect();
+	void CompleteDelayedTurnEnd();
+	void AdvanceFromDisconnectedBuilder();
+	int32 GetEligibleGuesserCount(APlayerController* Builder) const;
+	bool HaveAllEligibleGuessersAnswered(APlayerController* Builder) const;
+	void SendTurnRoles(APlayerController* Builder);
 	void EndMatch();
 	void ReturnToLobby();
 };

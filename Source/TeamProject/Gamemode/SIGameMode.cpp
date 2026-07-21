@@ -246,7 +246,7 @@ void ASIGameMode::Logout(AController* Exiting)
 	const ASIGameState* CurrentSIState = GetGameState<ASIGameState>();
 	const bool bRemovedCurrentWorkspaceOwner = RemovedIndex == CurrentWorkspaceIndex
 		&& CurrentSIState
-		&& CurrentSIState->CurrentGamePhase == ESIGamePhase::GuessPhase;
+		&& CurrentSIState->CurrentGamePhase == ESIGamePhase::TurnPhase;
 
 	if (RemovedIndex != INDEX_NONE)
 	{
@@ -296,7 +296,14 @@ void ASIGameMode::Logout(AController* Exiting)
 	if (bRemovedCurrentWorkspaceOwner)
 	{
 		GetWorldTimerManager().ClearTimer(GameTimerHandle);
-		GetWorldTimerManager().SetTimerForNextTick(this, &ASIGameMode::StartNextGuessTurn);
+		bTurnTransitionPending = true;
+		GetWorldTimerManager().SetTimerForNextTick(this, &ASIGameMode::AdvanceFromDisconnectedBuilder);
+	}
+	else if (CurrentSIState && CurrentSIState->CurrentGamePhase == ESIGamePhase::TurnPhase
+		&& PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex)
+		&& HaveAllEligibleGuessersAnswered(PlayerOrderList[CurrentWorkspaceIndex]))
+	{
+		ScheduleTurnEndAfterAllCorrect();
 	}
 }
 
@@ -416,14 +423,26 @@ void ASIGameMode::StartGameMatch()
 		return;
 	}
 
-	if (SIState->CurrentGamePhase == ESIGamePhase::BuildPhase
+	if (SIState->CurrentGamePhase == ESIGamePhase::TurnPhase
+		|| SIState->CurrentGamePhase == ESIGamePhase::BuildPhase
 		|| SIState->CurrentGamePhase == ESIGamePhase::GuessPhase)
 	{
 		return;
 	}
 	
-	// ★ 방 설정 반영 (이후의 BuildTimeLimit/GuessTimeLimit 사용처가 전부 이 값을 씀)
+	// 호스트가 로비에서 확정한 턴 시간과 최대 도형 개수를 적용합니다.
 	ApplyHostMatchSettings();   
+
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		if (IsValid(Player))
+		{
+			if (ASICharacter* Character = Cast<ASICharacter>(Player->GetPawn()))
+			{
+				Character->SetMaxPlacedShapeCount(MaxPlacedShapeCount);
+			}
+		}
+	}
 
 	if (!AssignWordsToPlayers())
 	{
@@ -431,7 +450,7 @@ void ASIGameMode::StartGameMatch()
 	}
 
 	PlayerWorkspaceAreas.Empty();
-	SpawnPlayersToIndividualWorkspaces();
+	AssignPlayerWorkspaces();
 
 	for (APlayerController* Player : PlayerOrderList)
 	{
@@ -439,33 +458,18 @@ void ASIGameMode::StartGameMatch()
 		{
 			UE_LOG(LogTemp, Warning,
 				TEXT("[GameMode][Workspace] %s의 작업공간이 등록되지 않았습니다. "
-					"BP의 Individual 배치 직후 RegisterPlayerWorkspace를 호출해야 합니다."),
+					"BP AssignPlayerWorkspaces에서 RegisterPlayerWorkspace를 호출해야 합니다."),
 				*GetNameSafe(Player));
 		}
 	}
 
-	for (APlayerController* Player : PlayerOrderList)
-	{
-		const FSIAssignedKeyword* AssignedKeyword = PlayerAssignedWords.Find(Player);
-		if (AssignedKeyword)
-		{
-			if (ASIPlayerController* SIPlayer = Cast<ASIPlayerController>(Player))
-			{
-				SIPlayer->Client_ReceiveSecretWord(AssignedKeyword->Keyword);
-			}
-		}
-	}
-
-	CurrentWorkspaceIndex = -1;
+	CurrentWorkspaceIndex = 0;
 	CorrectPlayersThisTurn.Empty();
 	SIState->CurrentRound = 0;
 	SIState->TotalRounds = PlayerOrderList.Num();
 	SIState->SetCurrentWorkspaceOwner(nullptr);
-	SIState->SetRemainingTime(FMath::CeilToInt(BuildTimeLimit));
-	SIState->SetGamePhase(ESIGamePhase::BuildPhase);
+	StartNextTurn();
 
-	GetWorldTimerManager().SetTimer(
-		GameTimerHandle, this, &ASIGameMode::EndBuildPhase, BuildTimeLimit, false);
 	GetWorldTimerManager().SetTimer(
 		UITimerTickHandle, this, &ASIGameMode::OnUITimerTick, 1.0f, true);
 }
@@ -488,14 +492,13 @@ void ASIGameMode::ApplyHostMatchSettings()
 		BuildTimeLimit = FMath::Clamp(HostParams.BuildTime,
 			SIRoomSettingLimits::MinBuildTime, SIRoomSettingLimits::MaxBuildTime);
 	}
-	if (HostParams.GuessTime > 0.0f)
-	{
-		GuessTimeLimit = FMath::Clamp(HostParams.GuessTime,
-			SIRoomSettingLimits::MinGuessTime, SIRoomSettingLimits::MaxGuessTime);
-	}
+	MaxPlacedShapeCount = FMath::Clamp(
+		HostParams.MaxPlacedShapeCount,
+		SIRoomSettingLimits::MinPlacedShapeCount,
+		SIRoomSettingLimits::MaxPlacedShapeCount);
 
-	UE_LOG(LogTemp, Log, TEXT("[GameMode] Match settings: Build=%.0fs, Guess=%.0fs"),
-		BuildTimeLimit, GuessTimeLimit);
+	UE_LOG(LogTemp, Log, TEXT("[GameMode] Match settings: Build=%.0fs, MaxShapes=%d"),
+		BuildTimeLimit, MaxPlacedShapeCount);
 }
 
 int32 ASIGameMode::GetCreatorScoreForCorrectAnswer(
@@ -530,56 +533,80 @@ void ASIGameMode::OnUITimerTick()
 	SIState->SetRemainingTime(FMath::Max(FMath::CeilToInt(TimerRemaining), 0));
 }
 
-void ASIGameMode::EndBuildPhase()
+void ASIGameMode::StartNextTurn()
 {
-	for (APlayerController* Player : PlayerOrderList)
+	GetWorldTimerManager().ClearTimer(TurnTransitionTimerHandle);
+	bTurnTransitionPending = false;
+
+	while (PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex))
 	{
-		if (IsValid(Player))
+		APlayerController* Builder = PlayerOrderList[CurrentWorkspaceIndex];
+		if (IsValid(Builder) && PlayerAssignedWords.Contains(Builder)
+			&& PlayerWorkspaceAreas.Contains(Builder))
 		{
-			if (ASICharacter* SICharacter = Cast<ASICharacter>(Player->GetPawn()))
-			{
-				SICharacter->RestoreActiveShapeEditForPhaseChange();
-			}
+			break;
 		}
+		++CurrentWorkspaceIndex;
 	}
 
-	CurrentWorkspaceIndex = 0;
-	StartNextGuessTurn();
-}
-
-void ASIGameMode::StartNextGuessTurn()
-{
 	if (!PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex))
 	{
 		EndMatch();
 		return;
 	}
 
-	APlayerController* WorkspaceOwner = PlayerOrderList[CurrentWorkspaceIndex];
-	if (!IsValid(WorkspaceOwner) || !PlayerAssignedWords.Contains(WorkspaceOwner))
-	{
-		++CurrentWorkspaceIndex;
-		StartNextGuessTurn();
-		return;
-	}
+	APlayerController* Builder = PlayerOrderList[CurrentWorkspaceIndex];
+	CorrectPlayersThisTurn.Empty();
 
 	if (ASIGameState* SIState = GetGameState<ASIGameState>())
 	{
 		SIState->CurrentRound = CurrentWorkspaceIndex + 1;
 		SIState->TotalRounds = PlayerOrderList.Num();
-		SIState->SetCurrentWorkspaceOwner(WorkspaceOwner->PlayerState);
-		SIState->SetRemainingTime(FMath::CeilToInt(GuessTimeLimit));
-		SIState->SetGamePhase(ESIGamePhase::GuessPhase);
+		SIState->SetCurrentWorkspaceOwner(Builder->PlayerState);
+		SIState->SetRemainingTime(FMath::CeilToInt(BuildTimeLimit));
+		SIState->SetGamePhase(ESIGamePhase::TurnPhase);
 	}
 
-	SpawnPlayersToTargetWorkspace(WorkspaceOwner);
-	CorrectPlayersThisTurn.Empty();
+	MoveBuilderToWorkspace(Builder);
+	SpawnGuessersToTargetWorkspace(Builder);
+	SendTurnRoles(Builder);
 
 	GetWorldTimerManager().SetTimer(
-		GameTimerHandle, this, &ASIGameMode::EndGuessTurn, GuessTimeLimit, false);
+		GameTimerHandle, this, &ASIGameMode::EndCurrentTurn, BuildTimeLimit, false);
 }
 
-void ASIGameMode::SpawnPlayersToTargetWorkspace(APlayerController* TargetOwner)
+bool ASIGameMode::MoveBuilderToWorkspace(APlayerController* Builder)
+{
+	if (!HasAuthority() || !IsValid(Builder))
+	{
+		return false;
+	}
+
+	const TObjectPtr<AActor>* WorkspacePtr = PlayerWorkspaceAreas.Find(Builder);
+	AActor* Workspace = WorkspacePtr ? WorkspacePtr->Get() : nullptr;
+	APawn* Pawn = Builder->GetPawn();
+	if (!IsValid(Workspace) || !IsValid(Pawn))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[GameMode][BuilderSpawn] Missing pawn or workspace: %s"),
+			*GetNameSafe(Builder));
+		return false;
+	}
+
+	if (UPawnMovementComponent* MovementComponent = Pawn->GetMovementComponent())
+	{
+		MovementComponent->StopMovementImmediately();
+	}
+
+	const FVector Location = Workspace->GetActorLocation();
+	const FRotator Rotation = Workspace->GetActorRotation();
+	Pawn->SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	Builder->SetControlRotation(Rotation);
+	Builder->ClientSetRotation(Rotation, true);
+	Pawn->ForceNetUpdate();
+	return true;
+}
+
+void ASIGameMode::SpawnGuessersToTargetWorkspace(APlayerController* TargetOwner)
 {
 	if (!HasAuthority() || !IsValid(TargetOwner))
 	{
@@ -630,23 +657,24 @@ void ASIGameMode::SpawnPlayersToTargetWorkspace(APlayerController* TargetOwner)
 	const FVector FormationAnchor = CenterLocation + ViewDirection * GuessFormationOffsetTowardTarget;
 	const FVector LookAtLocation = TargetLocation + FVector(0.0f, 0.0f, GuessLookAtHeightOffset);
 
-	constexpr int32 PlayersPerRow = 4;
-	int32 ValidPlayerIndex = 0;
+	TArray<APlayerController*> Guessers;
 	for (APlayerController* Player : PlayerOrderList)
 	{
-		if (!IsValid(Player) || !IsValid(Player->GetPawn()))
+		if (Player != TargetOwner && IsValid(Player) && IsValid(Player->GetPawn()))
 		{
-			UE_LOG(LogTemp, Warning,
-				TEXT("[GameMode][GuessSpawn] 이동할 Pawn이 없습니다: %s"),
-				*GetNameSafe(Player));
-			continue;
+			Guessers.Add(Player);
 		}
+	}
 
-		const int32 Row = ValidPlayerIndex / PlayersPerRow;
-		const int32 Column = ValidPlayerIndex % PlayersPerRow;
+	constexpr int32 PlayersPerRow = 4;
+	for (int32 GuesserIndex = 0; GuesserIndex < Guessers.Num(); ++GuesserIndex)
+	{
+		APlayerController* Player = Guessers[GuesserIndex];
+		const int32 Row = GuesserIndex / PlayersPerRow;
+		const int32 Column = GuesserIndex % PlayersPerRow;
 		const int32 PlayersBeforeThisRow = Row * PlayersPerRow;
 		const int32 PlayersInThisRow = FMath::Min(
-			PlayersPerRow, PlayerOrderList.Num() - PlayersBeforeThisRow);
+			PlayersPerRow, Guessers.Num() - PlayersBeforeThisRow);
 		const float CenteredColumn = static_cast<float>(Column)
 			- static_cast<float>(PlayersInThisRow - 1) * 0.5f;
 
@@ -676,16 +704,107 @@ void ASIGameMode::SpawnPlayersToTargetWorkspace(APlayerController* TargetOwner)
 
 		UE_LOG(LogTemp, Log,
 			TEXT("[GameMode][GuessSpawn] %s -> Slot %d, Location=%s, TargetArea=%s"),
-			*GetNameSafe(Player), ValidPlayerIndex, *SpawnLocation.ToCompactString(),
+			*GetNameSafe(Player), GuesserIndex, *SpawnLocation.ToCompactString(),
 			*GetNameSafe(TargetArea));
-		++ValidPlayerIndex;
 	}
 }
 
-void ASIGameMode::EndGuessTurn()
+void ASIGameMode::EndCurrentTurn()
 {
+	if (bTurnTransitionPending)
+	{
+		return;
+	}
+
+	bTurnTransitionPending = true;
+	GetWorldTimerManager().ClearTimer(GameTimerHandle);
+
+	if (PlayerOrderList.IsValidIndex(CurrentWorkspaceIndex))
+	{
+		if (APlayerController* Builder = PlayerOrderList[CurrentWorkspaceIndex])
+		{
+			if (ASICharacter* Character = Cast<ASICharacter>(Builder->GetPawn()))
+			{
+				Character->RestoreActiveShapeEditForPhaseChange();
+			}
+		}
+	}
+
 	++CurrentWorkspaceIndex;
-	StartNextGuessTurn();
+	GetWorldTimerManager().SetTimerForNextTick(this, &ASIGameMode::StartNextTurn);
+}
+
+void ASIGameMode::ScheduleTurnEndAfterAllCorrect()
+{
+	if (bTurnTransitionPending)
+	{
+		return;
+	}
+
+	bTurnTransitionPending = true;
+	GetWorldTimerManager().ClearTimer(GameTimerHandle);
+
+	if (ASIGameState* SIState = GetGameState<ASIGameState>())
+	{
+		SIState->SetRemainingTime(0);
+	}
+
+	if (CorrectAnswerTransitionDelay <= 0.0f)
+	{
+		CompleteDelayedTurnEnd();
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		TurnTransitionTimerHandle,
+		this,
+		&ASIGameMode::CompleteDelayedTurnEnd,
+		CorrectAnswerTransitionDelay,
+		false);
+}
+
+void ASIGameMode::CompleteDelayedTurnEnd()
+{
+	bTurnTransitionPending = false;
+	EndCurrentTurn();
+}
+
+void ASIGameMode::AdvanceFromDisconnectedBuilder()
+{
+	bTurnTransitionPending = false;
+	StartNextTurn();
+}
+
+int32 ASIGameMode::GetEligibleGuesserCount(APlayerController* Builder) const
+{
+	int32 Count = 0;
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		if (IsValid(Player) && Player != Builder)
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+bool ASIGameMode::HaveAllEligibleGuessersAnswered(APlayerController* Builder) const
+{
+	const int32 EligibleCount = GetEligibleGuesserCount(Builder);
+	return EligibleCount > 0 && CorrectPlayersThisTurn.Num() >= EligibleCount;
+}
+
+void ASIGameMode::SendTurnRoles(APlayerController* Builder)
+{
+	const FSIAssignedKeyword* Keyword = PlayerAssignedWords.Find(Builder);
+	for (APlayerController* Player : PlayerOrderList)
+	{
+		if (ASIPlayerController* SIPlayer = Cast<ASIPlayerController>(Player))
+		{
+			SIPlayer->Client_ReceiveSecretWord(
+				Player == Builder && Keyword ? Keyword->Keyword : FString());
+		}
+	}
 }
 
 void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Message)
@@ -705,7 +824,8 @@ void ASIGameMode::OnChatReceived(APlayerController* Sender, const FString& Messa
 	BroadcastChat(Sender, NormalizedMessage);
 }
 
-void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString& SubmittedAnswer)
+void ASIGameMode::OnAnswerSubmitted(
+	APlayerController* Submitter, const FString& SubmittedAnswer, const int32 SubmittedRound)
 {
 	ASIGameState* SIState = GetGameState<ASIGameState>();
 	if (!SIState || !IsValid(Submitter) || !PlayerOrderList.Contains(Submitter))
@@ -714,7 +834,10 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 	}
 
 	FString NormalizedAnswer = SubmittedAnswer.TrimStartAndEnd();
-	if (NormalizedAnswer.IsEmpty() || SIState->CurrentGamePhase != ESIGamePhase::GuessPhase)
+	if (NormalizedAnswer.IsEmpty()
+		|| SIState->CurrentGamePhase != ESIGamePhase::TurnPhase
+		|| SIState->CurrentRound != SubmittedRound
+		|| bTurnTransitionPending)
 	{
 		return;
 	}
@@ -780,6 +903,11 @@ void ASIGameMode::OnAnswerSubmitted(APlayerController* Submitter, const FString&
 	Payload.ScoreEarned = ScoreToEarn;
 	Payload.bIsCorrect = true;
 	SIState->Multicast_BroadcastAnswerResult(Payload);
+
+	if (HaveAllEligibleGuessersAnswered(WorkspaceOwner))
+	{
+		ScheduleTurnEndAfterAllCorrect();
+	}
 }
 
 void ASIGameMode::BroadcastChat(APlayerController* Sender, const FString& Message)
@@ -802,12 +930,13 @@ void ASIGameMode::EndMatch()
 {
 	GetWorldTimerManager().ClearTimer(GameTimerHandle);
 	GetWorldTimerManager().ClearTimer(UITimerTickHandle);
+	GetWorldTimerManager().ClearTimer(TurnTransitionTimerHandle);
 
 	if (ASIGameState* SIState = GetGameState<ASIGameState>())
 	{
 		SIState->SetRemainingTime(0);
-		SIState->SetCurrentWorkspaceOwner(nullptr);
 		SIState->SetGamePhase(ESIGamePhase::ResultPhase);
+		SIState->SetCurrentWorkspaceOwner(nullptr);
 		SIState->Multicast_BroadcastMatchEnded();
 	}
 

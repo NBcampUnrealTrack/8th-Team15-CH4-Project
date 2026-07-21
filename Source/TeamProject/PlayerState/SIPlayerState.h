@@ -65,5 +65,5 @@ public:
 	// 값 검증(권한/범위)은 전적으로 서버가 하며, 클라이언트 입력은 신뢰하지 않는다.
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Lobby")
 	void Server_UpdateRoomSettings(const FString& RoomTitle, const FString& Password,
-		float BuildTime, float GuessTime);
+		float BuildTime, int32 MaxPlacedShapeCount);
 };

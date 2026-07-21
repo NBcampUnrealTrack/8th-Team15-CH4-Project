@@ -332,6 +332,7 @@ void ASICharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME_CONDITION(ASICharacter, PlacedShapeCount, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(ASICharacter, MaxPlacedShapeCount, COND_OwnerOnly);
 }
 
 void ASICharacter::UpdateMeshVisibility()
@@ -1360,7 +1361,9 @@ bool ASICharacter::IsShapeEditingAllowed() const
 {
 	const UWorld* World = GetWorld();
 	const ASIGameState* SIState = World ? World->GetGameState<ASIGameState>() : nullptr;
-	return SIState && SIState->CurrentGamePhase == ESIGamePhase::BuildPhase;
+	return SIState
+		&& SIState->CurrentGamePhase == ESIGamePhase::TurnPhase
+		&& SIState->CurrentWorkspaceOwner == GetPlayerState();
 }
 
 bool ASICharacter::IsServerInBuildPhase() const
@@ -1370,7 +1373,7 @@ bool ASICharacter::IsServerInBuildPhase() const
 
 void ASICharacter::HandleShapeEditingPhaseChanged(const ESIGamePhase NewPhase)
 {
-	if (NewPhase == ESIGamePhase::BuildPhase)
+	if (NewPhase == ESIGamePhase::TurnPhase && IsShapeEditingAllowed())
 	{
 		return;
 	}
@@ -1402,6 +1405,19 @@ int32 ASICharacter::GetRemainingPlacedShapeCount() const
 	return FMath::Clamp(MaxPlacedShapeCount - PlacedShapeCount, 0, MaxPlacedShapeCount);
 }
 
+void ASICharacter::SetMaxPlacedShapeCount(const int32 NewMaxPlacedShapeCount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	MaxPlacedShapeCount = FMath::Clamp(NewMaxPlacedShapeCount, 10, 40);
+	PlacedShapeCount = FMath::Clamp(PlacedShapeCount, 0, MaxPlacedShapeCount);
+	OnRep_MaxPlacedShapeCount();
+	ForceNetUpdate();
+}
+
 void ASICharacter::SetPlacedShapeCount(const int32 NewCount)
 {
 	if (!HasAuthority())
@@ -1414,6 +1430,12 @@ void ASICharacter::SetPlacedShapeCount(const int32 NewCount)
 }
 
 void ASICharacter::OnRep_PlacedShapeCount()
+{
+	UpdatePlacementCountUI();
+	UpdateShapePanelAvailability();
+}
+
+void ASICharacter::OnRep_MaxPlacedShapeCount()
 {
 	UpdatePlacementCountUI();
 	UpdateShapePanelAvailability();

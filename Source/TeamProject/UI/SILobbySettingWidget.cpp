@@ -35,7 +35,7 @@ void USILobbySettingWidget::NativeConstruct()
 	}
 
 	for (UEditableText* SettingText : { EditableText_RoomName.Get(), EditableText_RoomPassword.Get(),
-		EditableText_BuildTimeLimit.Get(), EditableText_GuessTimeLimit.Get() })
+		EditableText_BuildTimeLimit.Get(), EditableText_MaxPlacedShapeCount.Get() })
 	{
 		if (IsValid(SettingText))
 		{
@@ -48,6 +48,12 @@ void USILobbySettingWidget::NativeConstruct()
 	{
 		EditableText_RoomPassword->OnTextChanged.AddDynamic(
 			this, &USILobbySettingWidget::HandleRoomPasswordChanged);
+	}
+
+	if (IsValid(EditableText_MaxPlacedShapeCount))
+	{
+		EditableText_MaxPlacedShapeCount->OnTextChanged.AddDynamic(
+			this, &USILobbySettingWidget::HandleMaxPlacedShapeCountChanged);
 	}
 
 	if (IsValid(EditableText_ChatInput))
@@ -122,7 +128,7 @@ void USILobbySettingWidget::NativeDestruct()
 	}
 
 	for (UEditableText* SettingText : { EditableText_RoomName.Get(), EditableText_RoomPassword.Get(),
-		EditableText_BuildTimeLimit.Get(), EditableText_GuessTimeLimit.Get() })
+		EditableText_BuildTimeLimit.Get(), EditableText_MaxPlacedShapeCount.Get() })
 	{
 		if (IsValid(SettingText))
 		{
@@ -135,6 +141,12 @@ void USILobbySettingWidget::NativeDestruct()
 	{
 		EditableText_RoomPassword->OnTextChanged.RemoveDynamic(
 			this, &USILobbySettingWidget::HandleRoomPasswordChanged);
+	}
+
+	if (IsValid(EditableText_MaxPlacedShapeCount))
+	{
+		EditableText_MaxPlacedShapeCount->OnTextChanged.RemoveDynamic(
+			this, &USILobbySettingWidget::HandleMaxPlacedShapeCountChanged);
 	}
 
 	if (CachedPlayerState.IsValid())
@@ -199,6 +211,11 @@ void USILobbySettingWidget::HandleRoomPasswordChanged(const FText& Text)
 	FilterEditableTextToDigits(EditableText_RoomPassword, Text);
 }
 
+void USILobbySettingWidget::HandleMaxPlacedShapeCountChanged(const FText& Text)
+{
+	FilterEditableTextToDigits(EditableText_MaxPlacedShapeCount, Text);
+}
+
 void USILobbySettingWidget::HandleRoomSettingCommitted(const FText& Text, const ETextCommit::Type CommitMethod)
 {
 	// 참가자 칸은 ReadOnly라 여기까지 오지 않지만, 호스트 승계 직후 등을 대비해 한 번 더 막는다
@@ -239,11 +256,11 @@ void USILobbySettingWidget::SubmitRoomSettings()
 		? FCString::Atof(*EditableText_BuildTimeLimit->GetText().ToString())
 		: 0.0f;
 
-	const float GuessTime = EditableText_GuessTimeLimit
-		? FCString::Atof(*EditableText_GuessTimeLimit->GetText().ToString())
-		: 0.0f;
+	const int32 MaxPlacedShapeCount = EditableText_MaxPlacedShapeCount
+		? FCString::Atoi(*EditableText_MaxPlacedShapeCount->GetText().ToString())
+		: SIRoomSettingLimits::DefaultPlacedShapeCount;
 
-	PS->Server_UpdateRoomSettings(RoomTitle, Password, BuildTime, GuessTime);
+	PS->Server_UpdateRoomSettings(RoomTitle, Password, BuildTime, MaxPlacedShapeCount);
 }
 
 void USILobbySettingWidget::HandleHostStatusChanged(bool bNewIsHost)
@@ -267,7 +284,7 @@ void USILobbySettingWidget::HandleHostStatusChanged(bool bNewIsHost)
 	// 방 설정을 바꿀 수 있는 건 호스트뿐 — 나머지는 값을 보기만 한다
 	const bool bReadOnly = !bIsLocalPlayerHost;
 	for (UEditableText* SettingText : { EditableText_RoomName.Get(), EditableText_RoomPassword.Get(),
-		EditableText_BuildTimeLimit.Get(), EditableText_GuessTimeLimit.Get() })
+		EditableText_BuildTimeLimit.Get(), EditableText_MaxPlacedShapeCount.Get() })
 	{
 		if (IsValid(SettingText))
 		{
@@ -355,9 +372,10 @@ void USILobbySettingWidget::RefreshRoomInfo()
 		EditableText_BuildTimeLimit->SetText(FormatTimeLimit(GS->LobbyBuildTime));
 	}
 
-	if (IsValid(EditableText_GuessTimeLimit))
+	if (IsValid(EditableText_MaxPlacedShapeCount))
 	{
-		EditableText_GuessTimeLimit->SetText(FormatTimeLimit(GS->LobbyGuessTime));
+		EditableText_MaxPlacedShapeCount->SetText(
+			FText::AsNumber(GS->LobbyMaxPlacedShapeCount));
 	}
 
 	// 비밀번호는 복제되지 않는다 — 호스트만 자기 서브시스템에서 원본을 읽는다

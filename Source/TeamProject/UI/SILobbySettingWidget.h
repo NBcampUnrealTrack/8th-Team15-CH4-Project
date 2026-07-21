@@ -40,7 +40,7 @@ private:
 	TObjectPtr<UEditableText> EditableText_BuildTimeLimit;
 	
 	UPROPERTY(Meta = (BindWidget))
-	TObjectPtr<UEditableText> EditableText_GuessTimeLimit;
+	TObjectPtr<UEditableText> EditableText_MaxPlacedShapeCount;
 
 	// ── 채팅 (인게임 HUD와 같은 구성) ──
 	// BindWidgetOptional인 이유: 이 셋이 없어도 로비의 나머지 기능은 그대로 동작해야 한다.
@@ -73,6 +73,9 @@ private:
 	/** 비밀번호 칸은 숫자만 받는다 (실제 필터는 USIUserWidget::FilterEditableTextToDigits) */
 	UFUNCTION()
 	void HandleRoomPasswordChanged(const FText& Text);
+
+	UFUNCTION()
+	void HandleMaxPlacedShapeCountChanged(const FText& Text);
 
 	/** ── 채팅 ── 기록은 ASIPlayerController가 남기고 여기선 그리기만 한다 */
 	UFUNCTION()

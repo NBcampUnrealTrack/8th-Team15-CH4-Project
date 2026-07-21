@@ -26,7 +26,7 @@ void ASIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(ASIGameState, LobbyRoomTitle);
 	DOREPLIFETIME(ASIGameState, LobbyMaxPlayers);
 	DOREPLIFETIME(ASIGameState, LobbyBuildTime);
-	DOREPLIFETIME(ASIGameState, LobbyGuessTime);
+	DOREPLIFETIME(ASIGameState, LobbyMaxPlacedShapeCount);
 }
 
 void ASIGameState::OnRep_LobbyRoomInfo()
@@ -35,7 +35,7 @@ void ASIGameState::OnRep_LobbyRoomInfo()
 }
 
 void ASIGameState::SetLobbyRoomInfo(const FString& InRoomTitle, const int32 InMaxPlayers,
-	const float InBuildTime, const float InGuessTime)
+	const float InBuildTime, const int32 InMaxPlacedShapeCount)
 {
 	if (!HasAuthority())
 	{
@@ -45,7 +45,7 @@ void ASIGameState::SetLobbyRoomInfo(const FString& InRoomTitle, const int32 InMa
 	LobbyRoomTitle = InRoomTitle;
 	LobbyMaxPlayers = InMaxPlayers;
 	LobbyBuildTime = InBuildTime;
-	LobbyGuessTime = InGuessTime;
+	LobbyMaxPlacedShapeCount = InMaxPlacedShapeCount;
 
 	// 리슨 서버(호스트)에는 OnRep이 호출되지 않으므로 직접 알립니다.
 	OnRep_LobbyRoomInfo();

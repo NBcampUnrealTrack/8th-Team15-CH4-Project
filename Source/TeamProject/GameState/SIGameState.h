@@ -77,7 +77,7 @@ public:
 	float LobbyBuildTime = 0.0f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_LobbyRoomInfo, Transient, BlueprintReadOnly, Category = "Lobby")
-	float LobbyGuessTime = 0.0f;
+	int32 LobbyMaxPlacedShapeCount = 25;
 
 	UFUNCTION()
 	void OnRep_LobbyRoomInfo();
@@ -85,7 +85,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnLobbyRoomInfoChangedSignature OnLobbyRoomInfoChanged;
 
-	void SetLobbyRoomInfo(const FString& InRoomTitle, int32 InMaxPlayers, float InBuildTime, float InGuessTime);
+	void SetLobbyRoomInfo(
+		const FString& InRoomTitle, int32 InMaxPlayers, float InBuildTime, int32 InMaxPlacedShapeCount);
 
 	// 서버에서 값을 변경하면서 Listen Server의 로컬 UI에도 즉시 알립니다.
 	void SetGamePhase(ESIGamePhase NewPhase);

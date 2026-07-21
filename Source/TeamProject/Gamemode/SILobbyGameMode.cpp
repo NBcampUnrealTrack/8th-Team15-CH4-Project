@@ -135,7 +135,7 @@ void ASILobbyGameMode::BeginPlay()
 		{
 			const FSICreateSessionParams& HostParams = Subsystem->GetHostSessionParams();
 			SIState->SetLobbyRoomInfo(
-				HostParams.RoomTitle, HostParams.MaxPlayers, HostParams.BuildTime, HostParams.GuessTime);
+				HostParams.RoomTitle, HostParams.MaxPlayers, HostParams.BuildTime, HostParams.MaxPlacedShapeCount);
 
 			// 로비에 있다 = 대기중. 게임이 끝나고 돌아온 경우까지 여기서 함께 처리된다.
 			Subsystem->SetSessionInProgress(false);
@@ -238,7 +238,7 @@ void ASILobbyGameMode::AssignHostIfNeeded()
 }
 
 void ASILobbyGameMode::UpdateRoomSettings(ASIPlayerState* RequestingPlayerState, const FString& RoomTitle,
-	const FString& Password, const float BuildTime, const float GuessTime)
+	const FString& Password, const float BuildTime, const int32 MaxPlacedShapeCount)
 {
 	// 이미 게임 시작이 예약됐으면 설정 변경을 받지 않는다 (travel 직전 값이 흔들리는 것 방지)
 	if (bTravelRequested || !IsValid(RequestingPlayerState) || !RequestingPlayerState->bIsHost)
@@ -270,9 +270,12 @@ void ASILobbyGameMode::UpdateRoomSettings(ASIPlayerState* RequestingPlayerState,
 		? FMath::Clamp(BuildTime, SIRoomSettingLimits::MinBuildTime, SIRoomSettingLimits::MaxBuildTime)
 		: 0.0f;
 
-	NewParams.GuessTime = GuessTime > 0.0f
-		? FMath::Clamp(GuessTime, SIRoomSettingLimits::MinGuessTime, SIRoomSettingLimits::MaxGuessTime)
-		: 0.0f;
+	NewParams.MaxPlacedShapeCount = FMath::Clamp(
+		MaxPlacedShapeCount > 0
+			? MaxPlacedShapeCount
+			: SIRoomSettingLimits::DefaultPlacedShapeCount,
+		SIRoomSettingLimits::MinPlacedShapeCount,
+		SIRoomSettingLimits::MaxPlacedShapeCount);
 
 	Subsystem->UpdateHostSessionParams(NewParams);
 
@@ -280,7 +283,7 @@ void ASILobbyGameMode::UpdateRoomSettings(ASIPlayerState* RequestingPlayerState,
 	if (ASIGameState* SIState = GetGameState<ASIGameState>())
 	{
 		SIState->SetLobbyRoomInfo(
-			NewParams.RoomTitle, NewParams.MaxPlayers, NewParams.BuildTime, NewParams.GuessTime);
+			NewParams.RoomTitle, NewParams.MaxPlayers, NewParams.BuildTime, NewParams.MaxPlacedShapeCount);
 	}
 }
 

@@ -29,7 +29,7 @@ private:
 	TObjectPtr<UEditableText> EditableText_BuildTimeLimit;
 	
 	UPROPERTY(BlueprintReadOnly, Meta = (BindWidget, AllowPrivateAccess = "true"))
-	TObjectPtr<UEditableText> EditableText_GuessTimeLimit;
+	TObjectPtr<UEditableText> EditableText_MaxPlacedShapeCount;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Button_Back;
@@ -52,4 +52,7 @@ private:
 		로비에서 그 칸을 건드리는 순간 조용히 지워진다. */
 	UFUNCTION()
 	void HandleRoomPasswordChanged(const FText& Text);
+
+	UFUNCTION()
+	void HandleMaxPlacedShapeCountChanged(const FText& Text);
 };

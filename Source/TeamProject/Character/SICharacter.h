@@ -181,7 +181,8 @@ protected:
 	TSubclassOf<APlacedShapeActor> PlacedShapeActorClass;
 
 	// 캐릭터 한 명이 빌드 페이즈에 설치할 수 있는 최대 도형 수
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement|Limits", meta = (ClampMin = "1", UIMin = "1"))
+	UPROPERTY(ReplicatedUsing = OnRep_MaxPlacedShapeCount, EditDefaultsOnly, BlueprintReadOnly,
+		Category = "Placement|Limits", meta = (ClampMin = "10", ClampMax = "40", UIMin = "10", UIMax = "40"))
 	int32 MaxPlacedShapeCount;
 
 	UPROPERTY()
@@ -240,6 +241,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Placement|Limits")
 	int32 GetRemainingPlacedShapeCount() const;
 
+	void SetMaxPlacedShapeCount(int32 NewMaxPlacedShapeCount);
+
 	void HandleShapeEditingPhaseChanged(ESIGamePhase NewPhase);
 	void RestoreActiveShapeEditForPhaseChange();
 	
@@ -277,6 +280,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_PlacedShapeCount();
+
+	UFUNCTION()
+	void OnRep_MaxPlacedShapeCount();
 
 	// 서버가 보관하는 재배치 원본 정보다.
 	bool bHasServerActiveShapeEdit = false;
